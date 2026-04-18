@@ -48,7 +48,7 @@
     roadOffset: 0,
     roadSideOffset: 0,
     clouds: seedClouds(),
-    trees: seedTrees(),
+    scenery: seedScenery(),
     shake: 0,
     pointerActive: false,
     keyLeft: false,
@@ -57,6 +57,7 @@
     phaseT: 0,
     boss: null,
     bossAnnounce: 0,
+    bullets: [],
   };
 
   bestEl.textContent = "최고 " + state.best;
@@ -73,15 +74,34 @@
     return arr;
   }
 
-  function seedTrees() {
-    const arr = [];
-    for (let i = 0; i < 14; i++) {
-      arr.push({
-        x: Math.random() < 0.5 ? 30 + Math.random() * 80 : W - 110 + Math.random() * 80,
-        y: Math.random() * H,
-        r: 34 + Math.random() * 20,
-      });
+  const DAEJEON_SIGNS = [
+    "둔산대로", "은행동", "대흥로", "갑천대로",
+    "계룡로", "중앙로", "월평동", "유성IC",
+    "대전역", "탄방동", "문화로",
+  ];
+
+  function makeScenery(y) {
+    const side = Math.random() < 0.5 ? "L" : "R";
+    const roll = Math.random();
+    let kind, w, h;
+    if (roll < 0.18) {
+      kind = "sungsimdang"; w = 120; h = 140;
+    } else if (roll < 0.55) {
+      kind = "sign"; w = 90; h = 100;
+    } else if (roll < 0.85) {
+      kind = "building"; w = 110; h = 100 + Math.random() * 60;
+    } else {
+      kind = "tree"; w = 60; h = 60;
     }
+    const x = side === "L"
+      ? 10 + Math.random() * (W * 0.18 - 20 - w)
+      : W - W * 0.18 + 10 + Math.random() * (W * 0.18 - 20 - w);
+    return { kind, x, y, w, h, label: DAEJEON_SIGNS[Math.floor(Math.random() * DAEJEON_SIGNS.length)] };
+  }
+
+  function seedScenery() {
+    const arr = [];
+    for (let i = 0; i < 10; i++) arr.push(makeScenery(Math.random() * H));
     return arr;
   }
 
@@ -96,11 +116,12 @@
     state.obstacles = [];
     state.shake = 0;
     state.clouds = seedClouds();
-    state.trees = seedTrees();
+    state.scenery = seedScenery();
     state.phase = "normal";
     state.phaseT = 0;
     state.boss = null;
     state.bossAnnounce = 0;
+    state.bullets = [];
     scoreEl.textContent = "점수 0";
   }
 
@@ -155,13 +176,15 @@
   }
 
   // --- spawning ---
-  // obstacles: 0 = net (zookeeper net), 1 = fence, 2 = barrel, 3 = "female" wolf (twist)
+  // obstacles: 0 = person (zookeeper/police/rescue), 1 = fence, 2 = barrel, 3 = "female" wolf (twist)
+  const PERSON_KINDS = ["zookeeper", "police", "rescue"];
   function spawnObstacle() {
     const kind = Math.random();
-    let type, w, h;
-    if (kind < 0.45) {
-      type = 0; w = OBS_W; h = OBS_H;
-    } else if (kind < 0.72) {
+    let type, w, h, sub = null;
+    if (kind < 0.5) {
+      type = 0; w = 110; h = 150;
+      sub = PERSON_KINDS[Math.floor(Math.random() * PERSON_KINDS.length)];
+    } else if (kind < 0.75) {
       type = 1; w = 220 + Math.random() * 160; h = 70;
     } else if (kind < 0.88) {
       type = 2; w = 110; h = 110;
@@ -169,7 +192,7 @@
       type = 3; w = 120; h = 150;
     }
     const x = PLAYER_MARGIN + Math.random() * (W - PLAYER_MARGIN * 2 - w);
-    state.obstacles.push({ type, x, y: -h - 40, w, h, passed: false, phase: Math.random() * Math.PI * 2 });
+    state.obstacles.push({ type, sub, x, y: -h - 40, w, h, passed: false, phase: Math.random() * Math.PI * 2 });
   }
 
   // --- update ---
@@ -207,13 +230,10 @@
         c.r = 40 + Math.random() * 50;
       }
     }
-    for (const t of state.trees) {
-      t.y += state.scroll * 0.9 * dt;
-      if (t.y - t.r > H) {
-        t.y = -t.r;
-        t.x = Math.random() < 0.5 ? 30 + Math.random() * 80 : W - 110 + Math.random() * 80;
-        t.r = 34 + Math.random() * 20;
-      }
+    for (let i = 0; i < state.scenery.length; i++) {
+      const s = state.scenery[i];
+      s.y += state.scroll * 0.9 * dt;
+      if (s.y - s.h > H) state.scenery[i] = makeScenery(-s.h - Math.random() * 200);
     }
 
     // player hitbox (reused for obstacle + boss collision — forgiving)
@@ -234,14 +254,16 @@
       if (state.phaseT >= 2.2 && state.obstacles.length === 0) {
         state.phase = "boss";
         state.phaseT = 0;
+        const fromLeft = Math.random() < 0.5;
         state.boss = {
-          x: W / 2,
-          y: -220,
-          w: 360,
-          h: 260,
-          vx: 260,
-          descend: 24,
-          hit: false,
+          x: fromLeft ? -180 : W + 180,
+          y: 220,
+          w: 260,
+          h: 230,
+          vx: (fromLeft ? 1 : -1) * 170,
+          vy: 55,
+          fireTimer: 0.6,
+          dir: fromLeft ? 1 : -1,
         };
       }
     }
@@ -262,28 +284,54 @@
     for (const o of state.obstacles) o.y += state.scroll * dt;
     state.obstacles = state.obstacles.filter((o) => o.y < H + 60);
 
-    // boss movement
+    // boss: diagonal cross + periodic 관세 bullets
     if (state.phase === "boss" && state.boss) {
       const b = state.boss;
       b.x += b.vx * dt;
-      if (b.x - b.w / 2 < PLAYER_MARGIN) { b.x = PLAYER_MARGIN + b.w / 2; b.vx = Math.abs(b.vx); }
-      if (b.x + b.w / 2 > W - PLAYER_MARGIN) { b.x = W - PLAYER_MARGIN - b.w / 2; b.vx = -Math.abs(b.vx); }
-      b.y += b.descend * dt;
-      // slight speed-up
-      b.vx *= 1 + dt * 0.05;
-      // collision with boss
-      const bx1 = b.x - b.w / 2 + 30;
-      const bx2 = b.x + b.w / 2 - 30;
-      const by1 = b.y + 20;
-      const by2 = b.y + b.h - 20;
-      if (px1 < bx2 && px2 > bx1 && py1 < by2 && py2 > by1) {
-        gameOver("trump");
+      b.y += b.vy * dt;
+      b.fireTimer -= dt;
+      if (b.fireTimer <= 0) {
+        const bx = b.x;
+        const by = b.y + b.h * 0.5;
+        const dx = p.x - bx;
+        const dy = PLAYER_Y - by;
+        const mag = Math.hypot(dx, dy) || 1;
+        const speed = 520;
+        state.bullets.push({
+          x: bx, y: by,
+          vx: dx / mag * speed,
+          vy: dy / mag * speed,
+          r: 26,
+          spin: 0,
+        });
+        b.fireTimer = 0.75;
+      }
+      // boss body does NOT collide — only bullets do
+      // victory when boss exits opposite side
+      if (b.x - b.w / 2 > W + 40 || b.x + b.w / 2 < -40) {
+        state.phase = "victory";
+        state.boss = null;
+        victory();
         return;
       }
-      // victory when boss descends past player
-      if (b.y > PLAYER_Y + PLAYER_H) {
-        state.phase = "victory";
-        victory();
+    }
+
+    // bullets update
+    for (const bt of state.bullets) {
+      bt.x += bt.vx * dt;
+      bt.y += bt.vy * dt;
+      bt.spin += dt * 6;
+    }
+    state.bullets = state.bullets.filter(
+      (bt) => bt.y < H + 60 && bt.y > -60 && bt.x > -60 && bt.x < W + 60
+    );
+
+    // bullet collision
+    for (const bt of state.bullets) {
+      const dx = bt.x - p.x;
+      const dy = bt.y - PLAYER_Y;
+      if (Math.hypot(dx, dy) < bt.r + 24) {
+        gameOver("trump");
         return;
       }
     }
@@ -318,60 +366,164 @@
     const isBossBg = state.phase === "approach" || state.phase === "boss" || state.phase === "victory";
 
     if (isBossBg) {
-      // sunset sky + ocean strait
-      const g = ctx.createLinearGradient(0, 0, 0, H);
-      g.addColorStop(0, "#ff6a3d");
-      g.addColorStop(0.55, "#ffb56b");
-      g.addColorStop(1, "#1f3a5c");
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, W, H);
+      // sunset sky
+      const sky = ctx.createLinearGradient(0, 0, 0, H * 0.55);
+      sky.addColorStop(0, "#ff5a2a");
+      sky.addColorStop(0.5, "#ff9b4a");
+      sky.addColorStop(1, "#ffd27a");
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, W, H * 0.55);
 
-      // water shimmer
-      ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
-      const band = 40;
-      for (let y = (state.roadOffset % band) - band; y < H + band; y += band) {
-        ctx.fillRect(0, y, W, 4);
+      // sun disc
+      ctx.fillStyle = "#fff0b0";
+      ctx.beginPath();
+      ctx.arc(W / 2, H * 0.32, 85, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255, 220, 150, 0.4)";
+      ctx.beginPath();
+      ctx.arc(W / 2, H * 0.32, 130, 0, Math.PI * 2);
+      ctx.fill();
+
+      // sea
+      const sea = ctx.createLinearGradient(0, H * 0.55, 0, H);
+      sea.addColorStop(0, "#2a6a8a");
+      sea.addColorStop(1, "#0f2440");
+      ctx.fillStyle = sea;
+      ctx.fillRect(0, H * 0.55, W, H * 0.45);
+
+      // sun reflection shimmer
+      ctx.fillStyle = "rgba(255, 240, 160, 0.45)";
+      const shimmer = Math.sin(state.phaseT * 3) * 8;
+      for (let y = H * 0.56; y < H; y += 18) {
+        const wobble = Math.sin(y * 0.05 + state.phaseT * 2) * 10 + shimmer;
+        ctx.fillRect(W / 2 - 30 + wobble, y, 60 - Math.abs(wobble), 3);
       }
 
-      // distant cliffs (left/right)
-      ctx.fillStyle = "#3a2c1e";
+      // wave stripes across
+      ctx.strokeStyle = "rgba(255,255,255,0.25)";
+      ctx.lineWidth = 2;
+      for (let y = H * 0.58; y < H; y += 46) {
+        ctx.beginPath();
+        for (let x = 0; x <= W; x += 20) {
+          const wy = y + Math.sin(x * 0.06 + state.phaseT * 4) * 4;
+          if (x === 0) ctx.moveTo(x, wy); else ctx.lineTo(x, wy);
+        }
+        ctx.stroke();
+      }
+
+      // distant oil tanker
+      const tankerX = (state.phaseT * 40) % (W + 400) - 200;
+      ctx.fillStyle = "#222";
+      roundRect(tankerX, H * 0.58, 180, 30, 6); ctx.fill();
+      ctx.fillStyle = "#e84a2a";
+      ctx.fillRect(tankerX + 140, H * 0.58 - 36, 14, 36);
+      ctx.fillStyle = "#888";
+      ctx.fillRect(tankerX + 80, H * 0.58 - 18, 40, 18);
+
+      // dramatic cliffs — left
+      ctx.fillStyle = "#5a3a24";
       ctx.beginPath();
-      ctx.moveTo(0, 300); ctx.lineTo(140, 220); ctx.lineTo(190, 340); ctx.lineTo(120, 420); ctx.lineTo(0, 400); ctx.closePath(); ctx.fill();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, H * 0.62);
+      ctx.lineTo(110, H * 0.58);
+      ctx.lineTo(140, H * 0.48);
+      ctx.lineTo(100, H * 0.36);
+      ctx.lineTo(130, H * 0.22);
+      ctx.lineTo(90, H * 0.12);
+      ctx.lineTo(60, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#8a5a2e";
       ctx.beginPath();
-      ctx.moveTo(W, 260); ctx.lineTo(W - 180, 200); ctx.lineTo(W - 90, 320); ctx.lineTo(W - 150, 430); ctx.lineTo(W, 410); ctx.closePath(); ctx.fill();
+      ctx.moveTo(0, H * 0.28);
+      ctx.lineTo(80, H * 0.22);
+      ctx.lineTo(60, H * 0.4);
+      ctx.lineTo(0, H * 0.45);
+      ctx.closePath();
+      ctx.fill();
+
+      // dramatic cliffs — right
+      ctx.fillStyle = "#5a3a24";
+      ctx.beginPath();
+      ctx.moveTo(W, 0);
+      ctx.lineTo(W, H * 0.62);
+      ctx.lineTo(W - 120, H * 0.58);
+      ctx.lineTo(W - 150, H * 0.46);
+      ctx.lineTo(W - 100, H * 0.34);
+      ctx.lineTo(W - 140, H * 0.22);
+      ctx.lineTo(W - 80, H * 0.1);
+      ctx.lineTo(W - 40, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#8a5a2e";
+      ctx.beginPath();
+      ctx.moveTo(W, H * 0.3);
+      ctx.lineTo(W - 80, H * 0.24);
+      ctx.lineTo(W - 50, H * 0.42);
+      ctx.lineTo(W, H * 0.46);
+      ctx.closePath();
+      ctx.fill();
+
+      // cliff-top palms (tiny silhouettes)
+      ctx.fillStyle = "#1a1a1a";
+      ctx.fillRect(70, H * 0.12 - 18, 3, 18);
+      ctx.beginPath();
+      ctx.arc(72, H * 0.12 - 22, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(W - 65, H * 0.1 - 20, 3, 20);
+      ctx.beginPath();
+      ctx.arc(W - 63, H * 0.1 - 24, 10, 0, Math.PI * 2);
+      ctx.fill();
+
+      // banner at top
+      ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+      ctx.fillRect(80, 30, W - 160, 60);
+      ctx.strokeStyle = "#ffd84a"; ctx.lineWidth = 3;
+      ctx.strokeRect(80, 30, W - 160, 60);
+      ctx.fillStyle = "#ffd84a";
+      ctx.font = "bold 30px 'Apple SD Gothic Neo', sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("호르무즈 해협", W / 2, 58);
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 15px sans-serif";
+      ctx.fillText("STRAIT OF HORMUZ", W / 2, 78);
     } else {
-      // green fields
-      const g = ctx.createLinearGradient(0, 0, 0, H);
-      g.addColorStop(0, "#2e5d3c");
-      g.addColorStop(1, "#4a8257");
-      ctx.fillStyle = g;
+      // Daejeon city — sidewalks + asphalt road
+      ctx.fillStyle = "#c9c4b8";
       ctx.fillRect(0, 0, W, H);
 
-      ctx.fillStyle = "#7ea85a";
+      // asphalt road
+      ctx.fillStyle = "#2a2c31";
       ctx.fillRect(W * 0.18, 0, W * 0.64, H);
 
-      ctx.fillStyle = "#3d5a2a";
-      ctx.fillRect(W * 0.18 - 6, 0, 6, H);
-      ctx.fillRect(W * 0.82, 0, 6, H);
+      // curb edges
+      ctx.fillStyle = "#8a8578";
+      ctx.fillRect(W * 0.18 - 8, 0, 8, H);
+      ctx.fillRect(W * 0.82, 0, 8, H);
 
-      ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+      // solid white lane edges
+      ctx.fillStyle = "#e8e6dd";
+      ctx.fillRect(W * 0.2, 0, 4, H);
+      ctx.fillRect(W * 0.8 - 4, 0, 4, H);
+
+      // yellow dashed center line
+      ctx.fillStyle = "#ffd84a";
       const dash = 60;
-      const gap = 80;
+      const gap = 60;
       const step = dash + gap;
       for (let y = (state.roadOffset % step) - step; y < H + step; y += step) {
-        ctx.fillRect(W / 2 - 6, y, 12, dash);
+        ctx.fillRect(W / 2 - 5, y, 10, dash);
       }
 
-      for (const t of state.trees) {
-        ctx.fillStyle = "#2d4a25";
-        ctx.beginPath();
-        ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#3a6030";
-        ctx.beginPath();
-        ctx.arc(t.x - t.r * 0.3, t.y - t.r * 0.25, t.r * 0.6, 0, Math.PI * 2);
-        ctx.fill();
+      // sidewalk tiles
+      ctx.fillStyle = "rgba(0,0,0,0.06)";
+      for (let y = (state.roadOffset * 0.3 % 40) - 40; y < H + 40; y += 40) {
+        ctx.fillRect(20, y, W * 0.18 - 28, 2);
+        ctx.fillRect(W - W * 0.18 + 8, y, W * 0.18 - 28, 2);
       }
+
+      // scenery (signs, shops, etc.)
+      for (const s of state.scenery) drawScenery(s);
     }
 
     // soft clouds
@@ -387,130 +539,356 @@
 
   function drawPlayer() {
     const p = state.player;
-    const bob = Math.sin(p.bob * 14) * 4;
-    const x = p.x - PLAYER_W / 2;
+    const bob = Math.sin(p.bob * 14) * 3;
     const y = PLAYER_Y - PLAYER_H / 2 + bob;
+    const cx = p.x;
+
+    const FUR = "#b8b0a4";        // soft wolf gray-brown
+    const FUR_DARK = "#807769";   // back/tail darker
+    const BELLY = "#f3ece0";      // cream belly/muzzle
+    const EAR_PINK = "#ffb5c2";   // cute pink inner ear
+    const PAW = "#908578";
 
     // shadow
-    ctx.fillStyle = "rgba(0,0,0,0.28)";
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
     ctx.beginPath();
-    ctx.ellipse(p.x, PLAYER_Y + PLAYER_H / 2 + 6, PLAYER_W / 2 - 4, 12, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, PLAYER_Y + PLAYER_H / 2 + 8, PLAYER_W / 2 - 6, 10, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // tail (behind, points down-back)
-    ctx.fillStyle = "#6b4a2a";
+    // fluffy tail (3 bumps, animated sway)
+    const tailSway = Math.sin(p.bob * 10) * 6;
+    ctx.fillStyle = FUR_DARK;
     ctx.beginPath();
-    ctx.ellipse(p.x, y + PLAYER_H - 8, 18, 36, 0, 0, Math.PI * 2);
+    ctx.arc(cx + tailSway, y + PLAYER_H + 10, 16, 0, Math.PI * 2);
+    ctx.arc(cx + tailSway * 0.6, y + PLAYER_H - 4, 19, 0, Math.PI * 2);
+    ctx.arc(cx + tailSway * 0.3, y + PLAYER_H - 20, 17, 0, Math.PI * 2);
+    ctx.fill();
+    // tail tip highlight
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(cx + tailSway, y + PLAYER_H + 14, 8, 0, Math.PI * 2);
     ctx.fill();
 
-    // body (oval, top-down)
-    ctx.fillStyle = "#8a6640";
+    // hind legs (behind body)
+    const legSwing = Math.sin(p.bob * 22) * 7;
+    ctx.fillStyle = PAW;
+    roundRect(cx - 38, y + PLAYER_H * 0.72 + legSwing, 16, 22, 6); ctx.fill();
+    roundRect(cx + 22, y + PLAYER_H * 0.72 - legSwing, 16, 22, 6); ctx.fill();
+
+    // body (rounded, plump)
+    ctx.fillStyle = FUR;
     ctx.beginPath();
-    ctx.ellipse(p.x, y + PLAYER_H * 0.55, PLAYER_W / 2 - 12, PLAYER_H * 0.32, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, y + PLAYER_H * 0.6, PLAYER_W / 2 - 8, PLAYER_H * 0.34, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // back stripe
-    ctx.fillStyle = "#6b4a2a";
+    // belly patch
+    ctx.fillStyle = BELLY;
     ctx.beginPath();
-    ctx.ellipse(p.x, y + PLAYER_H * 0.5, 10, PLAYER_H * 0.28, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, y + PLAYER_H * 0.68, PLAYER_W / 2 - 22, PLAYER_H * 0.22, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // head (front, bigger — top-down view)
-    ctx.fillStyle = "#8a6640";
+    // front legs
+    ctx.fillStyle = PAW;
+    roundRect(cx - 30, y + PLAYER_H * 0.5 - legSwing, 15, 22, 6); ctx.fill();
+    roundRect(cx + 15, y + PLAYER_H * 0.5 + legSwing, 15, 22, 6); ctx.fill();
+
+    // neck ruff (fluffy collar)
+    ctx.fillStyle = FUR_DARK;
     ctx.beginPath();
-    ctx.ellipse(p.x, y + PLAYER_H * 0.22, 40, 38, 0, 0, Math.PI * 2);
+    ctx.arc(cx - 28, y + PLAYER_H * 0.38, 14, 0, Math.PI * 2);
+    ctx.arc(cx - 10, y + PLAYER_H * 0.36, 16, 0, Math.PI * 2);
+    ctx.arc(cx + 10, y + PLAYER_H * 0.36, 16, 0, Math.PI * 2);
+    ctx.arc(cx + 28, y + PLAYER_H * 0.38, 14, 0, Math.PI * 2);
     ctx.fill();
 
-    // ears (triangles on top corners)
-    ctx.fillStyle = "#6b4a2a";
+    // head (big round kawaii)
+    ctx.fillStyle = FUR;
     ctx.beginPath();
-    ctx.moveTo(p.x - 32, y + 6);
-    ctx.lineTo(p.x - 20, y - 14);
-    ctx.lineTo(p.x - 12, y + 10);
-    ctx.closePath();
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(p.x + 32, y + 6);
-    ctx.lineTo(p.x + 20, y - 14);
-    ctx.lineTo(p.x + 12, y + 10);
-    ctx.closePath();
-    ctx.fill();
-    // ear inner
-    ctx.fillStyle = "#d8a77a";
-    ctx.beginPath();
-    ctx.moveTo(p.x - 26, y + 2);
-    ctx.lineTo(p.x - 20, y - 8);
-    ctx.lineTo(p.x - 16, y + 6);
-    ctx.closePath();
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(p.x + 26, y + 2);
-    ctx.lineTo(p.x + 20, y - 8);
-    ctx.lineTo(p.x + 16, y + 6);
-    ctx.closePath();
+    ctx.ellipse(cx, y + PLAYER_H * 0.22, 46, 42, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // snout (pointing down toward bottom — but wolf runs UP, so snout at top)
-    ctx.fillStyle = "#d8c0a0";
+    // ears (pointier, with pink inner)
+    ctx.fillStyle = FUR_DARK;
+    // left
     ctx.beginPath();
-    ctx.ellipse(p.x, y + PLAYER_H * 0.08, 16, 14, 0, 0, Math.PI * 2);
+    ctx.moveTo(cx - 40, y + 8);
+    ctx.quadraticCurveTo(cx - 34, y - 26, cx - 18, y + 4);
+    ctx.quadraticCurveTo(cx - 20, y + 14, cx - 40, y + 8);
     ctx.fill();
-    // nose
+    // right
+    ctx.beginPath();
+    ctx.moveTo(cx + 40, y + 8);
+    ctx.quadraticCurveTo(cx + 34, y - 26, cx + 18, y + 4);
+    ctx.quadraticCurveTo(cx + 20, y + 14, cx + 40, y + 8);
+    ctx.fill();
+    // inner pink
+    ctx.fillStyle = EAR_PINK;
+    ctx.beginPath();
+    ctx.moveTo(cx - 32, y + 6);
+    ctx.quadraticCurveTo(cx - 30, y - 14, cx - 22, y + 4);
+    ctx.quadraticCurveTo(cx - 26, y + 10, cx - 32, y + 6);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx + 32, y + 6);
+    ctx.quadraticCurveTo(cx + 30, y - 14, cx + 22, y + 4);
+    ctx.quadraticCurveTo(cx + 26, y + 10, cx + 32, y + 6);
+    ctx.fill();
+
+    // face mask (lighter patch)
+    ctx.fillStyle = BELLY;
+    ctx.beginPath();
+    ctx.ellipse(cx, y + PLAYER_H * 0.18, 28, 22, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // snout (front, with muzzle)
+    ctx.fillStyle = BELLY;
+    ctx.beginPath();
+    ctx.ellipse(cx, y + PLAYER_H * 0.06, 18, 16, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // snout shadow
+    ctx.fillStyle = "rgba(0,0,0,0.05)";
+    ctx.beginPath();
+    ctx.ellipse(cx, y + PLAYER_H * 0.085, 18, 16, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // nose (heart-ish)
+    ctx.fillStyle = "#1a1a1a";
+    ctx.beginPath();
+    ctx.ellipse(cx - 4, y - 4, 5, 4, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + 4, y - 4, 5, 4, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, y, 8, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // tongue
+    ctx.fillStyle = "#ff7a9c";
+    roundRect(cx - 5, y + 6, 10, 12, 4);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.2)"; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx, y + 8); ctx.lineTo(cx, y + 16);
+    ctx.stroke();
+
+    // eyes — big, sparkly, kawaii
+    const eyeY = y + PLAYER_H * 0.2;
+    // white
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.ellipse(cx - 16, eyeY, 10, 12, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + 16, eyeY, 10, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // pupil
+    ctx.fillStyle = "#222";
+    ctx.beginPath();
+    ctx.ellipse(cx - 16, eyeY + 2, 6, 8, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + 16, eyeY + 2, 6, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // sparkle
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(cx - 14, eyeY - 1, 2.5, 0, Math.PI * 2);
+    ctx.arc(cx + 18, eyeY - 1, 2.5, 0, Math.PI * 2);
+    ctx.arc(cx - 18, eyeY + 4, 1.2, 0, Math.PI * 2);
+    ctx.arc(cx + 14, eyeY + 4, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // blush
+    ctx.fillStyle = "rgba(255, 150, 170, 0.55)";
+    ctx.beginPath();
+    ctx.ellipse(cx - 28, y + PLAYER_H * 0.26, 8, 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + 28, y + PLAYER_H * 0.26, 8, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawScenery(s) {
+    if (s.kind === "sungsimdang") {
+      // red-cream bakery with "성심당" sign and bread icon
+      ctx.fillStyle = "#e6d8b8";
+      roundRect(s.x, s.y, s.w, s.h, 6); ctx.fill();
+      // red roof / awning
+      ctx.fillStyle = "#c2342a";
+      ctx.fillRect(s.x - 4, s.y, s.w + 8, 26);
+      // signboard
+      ctx.fillStyle = "#fff4dc";
+      roundRect(s.x + 6, s.y + 30, s.w - 12, 28, 4); ctx.fill();
+      ctx.fillStyle = "#c2342a";
+      ctx.font = "bold 20px 'Apple SD Gothic Neo', sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("성심당", s.x + s.w / 2, s.y + 50);
+      // window
+      ctx.fillStyle = "#f5b3a3";
+      roundRect(s.x + 14, s.y + 70, s.w - 28, s.h - 88, 6); ctx.fill();
+      // bread icon
+      ctx.fillStyle = "#c49465";
+      ctx.beginPath();
+      ctx.ellipse(s.x + s.w / 2, s.y + s.h - 30, 22, 14, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.25)";
+      ctx.lineWidth = 1.5;
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(s.x + s.w / 2 + i * 6, s.y + s.h - 40);
+        ctx.lineTo(s.x + s.w / 2 + i * 6, s.y + s.h - 20);
+        ctx.stroke();
+      }
+      // door
+      ctx.fillStyle = "#3a2a20";
+      ctx.fillRect(s.x + s.w / 2 - 10, s.y + s.h - 8, 20, 8);
+    } else if (s.kind === "sign") {
+      // green street sign on pole
+      ctx.fillStyle = "#4a4a4a";
+      ctx.fillRect(s.x + s.w / 2 - 3, s.y + 40, 6, s.h - 40);
+      ctx.fillStyle = "#1f6f3e";
+      roundRect(s.x, s.y, s.w, 46, 4); ctx.fill();
+      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+      ctx.strokeRect(s.x + 3, s.y + 3, s.w - 6, 40);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 18px 'Apple SD Gothic Neo', sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(s.label, s.x + s.w / 2, s.y + 28);
+    } else if (s.kind === "building") {
+      // generic storefront
+      ctx.fillStyle = "#c8b8a0";
+      ctx.fillRect(s.x, s.y, s.w, s.h);
+      ctx.fillStyle = "#5a5040";
+      ctx.fillRect(s.x, s.y, s.w, 18);
+      // windows
+      ctx.fillStyle = "#6a8ea0";
+      const cols = 3, rows = Math.max(2, Math.floor((s.h - 26) / 28));
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          ctx.fillRect(
+            s.x + 10 + c * ((s.w - 20) / cols),
+            s.y + 26 + r * 28,
+            (s.w - 20) / cols - 6,
+            20
+          );
+        }
+      }
+    } else {
+      // tree
+      ctx.fillStyle = "#2d4a25";
+      ctx.beginPath();
+      ctx.arc(s.x + s.w / 2, s.y + s.h / 2, s.w / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#3a6030";
+      ctx.beginPath();
+      ctx.arc(s.x + s.w / 2 - 8, s.y + s.h / 2 - 6, s.w / 2 - 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function drawPerson(o) {
+    const cx = o.x + o.w / 2;
+    const y = o.y;
+    const h = o.h;
+    let uniform = "#7a6a3e", cap = "#4a5c2e", accent = "#d4c18b";
+    let label = null;
+    if (o.sub === "police") {
+      uniform = "#1b2c48"; cap = "#0f1a30"; accent = "#e8c547"; label = "POLICE";
+    } else if (o.sub === "rescue") {
+      uniform = "#e0742a"; cap = "#ffffff"; accent = "#d62a2a"; label = "119";
+    } else {
+      label = "5월드";
+    }
+    // shadow
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.beginPath();
+    ctx.ellipse(cx, y + h - 4, o.w * 0.4, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // legs
+    ctx.fillStyle = "#222";
+    roundRect(cx - 18, y + h * 0.7, 14, h * 0.28, 4); ctx.fill();
+    roundRect(cx + 4, y + h * 0.7, 14, h * 0.28, 4); ctx.fill();
+    // body
+    ctx.fillStyle = uniform;
+    roundRect(cx - o.w * 0.4, y + h * 0.3, o.w * 0.8, h * 0.45, 10); ctx.fill();
+    // belt
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(cx - o.w * 0.4, y + h * 0.65, o.w * 0.8, 6);
+    // arms extended (trying to catch)
+    ctx.fillStyle = uniform;
+    roundRect(cx - o.w * 0.58, y + h * 0.32, 18, h * 0.35, 8); ctx.fill();
+    roundRect(cx + o.w * 0.58 - 18, y + h * 0.32, 18, h * 0.35, 8); ctx.fill();
+    // hands
+    ctx.fillStyle = "#f2c29b";
+    ctx.beginPath();
+    ctx.arc(cx - o.w * 0.58 + 9, y + h * 0.67, 10, 0, Math.PI * 2);
+    ctx.arc(cx + o.w * 0.58 - 9, y + h * 0.67, 10, 0, Math.PI * 2);
+    ctx.fill();
+    // chest label badge
+    if (label) {
+      ctx.fillStyle = accent;
+      roundRect(cx - 22, y + h * 0.42, 44, 16, 3); ctx.fill();
+      ctx.fillStyle = "#1a1a1a";
+      ctx.font = "bold 11px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(label, cx, y + h * 0.42 + 12);
+    }
+    // head
+    ctx.fillStyle = "#f2c29b";
+    ctx.beginPath();
+    ctx.arc(cx, y + h * 0.2, 22, 0, Math.PI * 2);
+    ctx.fill();
+    // cap
+    ctx.fillStyle = cap;
+    ctx.beginPath();
+    ctx.arc(cx, y + h * 0.14, 22, Math.PI, 0);
+    ctx.fill();
+    ctx.fillRect(cx - 22, y + h * 0.14, 44, 6);
+    // cap brim
     ctx.fillStyle = "#111";
+    ctx.fillRect(cx - 26, y + h * 0.14 + 4, 52, 4);
+    // cap emblem
+    ctx.fillStyle = accent;
     ctx.beginPath();
-    ctx.ellipse(p.x, y + PLAYER_H * 0.02, 7, 5, 0, 0, Math.PI * 2);
+    ctx.arc(cx, y + h * 0.08, 4, 0, Math.PI * 2);
     ctx.fill();
-
     // eyes
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = "#1a1a1a";
     ctx.beginPath();
-    ctx.arc(p.x - 14, y + PLAYER_H * 0.22, 6, 0, Math.PI * 2);
-    ctx.arc(p.x + 14, y + PLAYER_H * 0.22, 6, 0, Math.PI * 2);
+    ctx.arc(cx - 6, y + h * 0.22, 2, 0, Math.PI * 2);
+    ctx.arc(cx + 6, y + h * 0.22, 2, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#111";
+    // mouth (determined line)
+    ctx.strokeStyle = "#1a1a1a"; ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(p.x - 14, y + PLAYER_H * 0.22, 3, 0, Math.PI * 2);
-    ctx.arc(p.x + 14, y + PLAYER_H * 0.22, 3, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(cx - 5, y + h * 0.26);
+    ctx.lineTo(cx + 5, y + h * 0.26);
+    ctx.stroke();
+  }
 
-    // running legs (side-bob animation)
-    const legSwing = Math.sin(p.bob * 24) * 8;
-    ctx.fillStyle = "#6b4a2a";
-    roundRect(p.x - 34, y + PLAYER_H * 0.55 + legSwing, 14, 24, 4);
+  function drawBullet(bt) {
+    ctx.save();
+    ctx.translate(bt.x, bt.y);
+    ctx.rotate(bt.spin);
+    // coin outer
+    ctx.fillStyle = "#e0a817";
+    ctx.beginPath();
+    ctx.arc(0, 0, bt.r, 0, Math.PI * 2);
     ctx.fill();
-    roundRect(p.x + 20, y + PLAYER_H * 0.55 - legSwing, 14, 24, 4);
+    // inner rim
+    ctx.fillStyle = "#f7d34a";
+    ctx.beginPath();
+    ctx.arc(0, 0, bt.r - 4, 0, Math.PI * 2);
     ctx.fill();
-    roundRect(p.x - 34, y + PLAYER_H * 0.78 - legSwing, 14, 22, 4);
-    ctx.fill();
-    roundRect(p.x + 20, y + PLAYER_H * 0.78 + legSwing, 14, 22, 4);
-    ctx.fill();
+    // edge darker
+    ctx.strokeStyle = "#8a5a0a"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, bt.r - 1, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    // text (not rotated — always readable)
+    ctx.fillStyle = "#7a3a0a";
+    ctx.font = "bold 18px 'Apple SD Gothic Neo', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("관세", bt.x, bt.y);
+    ctx.textBaseline = "alphabetic";
   }
 
   function drawObstacle(o) {
     if (o.type === 0) {
-      // sooyukza net: handle + round net
-      ctx.fillStyle = "#6b4a2a";
-      ctx.fillRect(o.x + o.w / 2 - 6, o.y + o.h * 0.55, 12, o.h * 0.45);
-      ctx.fillStyle = "#8a5a3a";
-      ctx.beginPath();
-      ctx.ellipse(o.x + o.w / 2, o.y + o.h * 0.4, o.w / 2 - 6, o.h * 0.38, 0, 0, Math.PI * 2);
-      ctx.fill();
-      // mesh
-      ctx.strokeStyle = "rgba(255,255,255,0.6)";
-      ctx.lineWidth = 2;
-      for (let i = -5; i <= 5; i++) {
-        const fx = i / 5;
-        ctx.beginPath();
-        ctx.moveTo(o.x + o.w / 2 + fx * (o.w / 2 - 10), o.y + o.h * 0.05);
-        ctx.lineTo(o.x + o.w / 2 + fx * (o.w / 2 - 10), o.y + o.h * 0.75);
-        ctx.stroke();
-      }
-      for (let i = 1; i <= 4; i++) {
-        const ry = o.y + o.h * (0.08 + i * 0.15);
-        ctx.beginPath();
-        ctx.ellipse(o.x + o.w / 2, ry, (o.w / 2 - 10) * (1 - i * 0.05), 6, 0, 0, Math.PI * 2);
-        ctx.stroke();
-      }
+      drawPerson(o);
     } else if (o.type === 1) {
       // wooden fence
       ctx.fillStyle = "#6b4a2a";
@@ -657,7 +1035,7 @@
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 18px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("도람뿌", cx, y + b.h * 0.05 + 19);
+    ctx.fillText("NUGU", cx, y + b.h * 0.05 + 19);
 
     // arms out (blocking)
     ctx.fillStyle = "#1b2a48";
@@ -693,6 +1071,7 @@
     for (const o of state.obstacles) drawObstacle(o);
     drawPlayer();
     if (state.phase === "boss" || state.phase === "victory") drawBoss();
+    for (const bt of state.bullets) drawBullet(bt);
     drawBossAnnounce();
     ctx.restore();
   }
