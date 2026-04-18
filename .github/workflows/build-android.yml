@@ -106,6 +106,7 @@ jobs:
           [gd_resource type="EditorSettings" format=3]
 
           [resource]
+          _editor_settings_advanced_mode = true
           export/android/java_sdk_path = "${JAVA_HOME}"
           export/android/android_sdk_path = "${ANDROID_HOME}"
           export/android/debug_keystore = "${{ steps.keystore.outputs.path }}"
@@ -168,6 +169,7 @@ jobs:
           [gd_resource type="EditorSettings" format=3]
 
           [resource]
+          _editor_settings_advanced_mode = true
           export/android/java_sdk_path = "${JAVA_HOME}"
           export/android/android_sdk_path = "${ANDROID_HOME}"
           export/android/debug_keystore = "${{ steps.keystore.outputs.path }}"
