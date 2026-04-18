@@ -6,9 +6,6 @@ on:
       - main
       - master
       - 'claude/**'
-    paths:
-      - 'web/**'
-      - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
 
 permissions:
