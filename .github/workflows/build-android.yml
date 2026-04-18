@@ -56,7 +56,7 @@ jobs:
           mv templates/* "${TEMPLATE_DIR}/"
           rmdir templates
           echo "--- template dir contents ---"
-          ls -la "${TEMPLATE_DIR}/"
+          ls -la "${TEMPLATE_DIR}/" | head -30
           echo "--- android templates present? ---"
           ls -la "${TEMPLATE_DIR}/android_debug.apk" "${TEMPLATE_DIR}/android_release.apk" \
                  "${TEMPLATE_DIR}/android_source.zip" 2>&1 || true
@@ -70,37 +70,13 @@ jobs:
             -storepass android \
             -dname "CN=Android Debug,O=Android,C=US" \
             -validity 9999 -deststoretype pkcs12
-          ls -la "${KEYSTORE_PATH}"
+          keytool -list -keystore "${KEYSTORE_PATH}" -storepass android | head -20
           echo "path=${KEYSTORE_PATH}" >> "$GITHUB_OUTPUT"
 
-      - name: Import project (populates .godot cache + default editor settings)
+      - name: Write Godot editor settings
         run: |
           mkdir -p ~/.config/godot
-          godot --headless --import 2>&1 || true
-          godot --headless --import 2>&1 || true
-          echo "--- .godot dir ---"
-          ls -la .godot/ 2>&1 || echo ".godot directory missing!"
-          echo "--- editor_settings file listing ---"
-          ls -la ~/.config/godot/ 2>&1 || true
-
-      - name: Write Android editor settings (overwrite after import)
-        run: |
-          SETTINGS_FILE=""
-          for candidate in \
-            ~/.config/godot/editor_settings-4.tres \
-            ~/.config/godot/editor_settings-4.4.tres \
-            ~/.config/godot/editor_settings-4.3.tres; do
-            if [ -f "$candidate" ]; then
-              SETTINGS_FILE="$candidate"
-              echo "Found existing settings file: $candidate"
-              break
-            fi
-          done
-          if [ -z "$SETTINGS_FILE" ]; then
-            SETTINGS_FILE="${HOME}/.config/godot/editor_settings-4.tres"
-            echo "No settings file found, creating: $SETTINGS_FILE"
-          fi
-
+          SETTINGS_FILE="${HOME}/.config/godot/editor_settings-4.tres"
           cat > "$SETTINGS_FILE" <<EOF
           [gd_resource type="EditorSettings" format=3]
 
@@ -114,58 +90,55 @@ jobs:
           export/android/shutdown_adb_on_exit = true
           export/android/one_click_deploy_clear_previous_install = false
           EOF
-
-          echo "--- final editor settings ---"
+          echo "--- editor_settings-4.tres ---"
           cat "$SETTINGS_FILE"
-          echo "--- environment ---"
+          echo "--- env ---"
           echo "JAVA_HOME=$JAVA_HOME"
           echo "ANDROID_HOME=$ANDROID_HOME"
-          java -version
+          java -version 2>&1
           echo "--- javac present? ---"
-          ls -la "$JAVA_HOME/bin/javac" 2>&1 || true
-          echo "--- keystore present? ---"
-          ls -la "${{ steps.keystore.outputs.path }}" 2>&1 || true
-          echo "--- android sdk dirs ---"
-          ls -la "$ANDROID_HOME/build-tools/" 2>&1 || true
-          ls -la "$ANDROID_HOME/platforms/" 2>&1 || true
-          ls -la "$ANDROID_HOME/platform-tools/" 2>&1 || true
+          ls -la "$JAVA_HOME/bin/javac"
+          echo "--- android sdk layout ---"
+          ls -la "$ANDROID_HOME/build-tools/"
+          ls -la "$ANDROID_HOME/platforms/"
+          ls -la "$ANDROID_HOME/platform-tools/" | head -5
 
-      - name: Dump preset config before export
+      - name: Import project (populate .godot cache)
         run: |
-          echo "--- export_presets.cfg (head) ---"
-          head -80 export_presets.cfg
-          echo "--- project.godot ---"
-          cat project.godot
+          godot --headless --import 2>&1 | tee import.log || true
+          godot --headless --import 2>&1 | tee -a import.log || true
+          echo "--- .godot dir ---"
+          ls -la .godot/ 2>&1 || echo "(.godot not created)"
+          echo "--- script parse errors (if any) ---"
+          grep -E "SCRIPT ERROR|Parse Error|Failed to load" import.log || echo "(no parse errors)"
 
-      - name: Diagnose export config via editor script
+      - name: Re-assert editor settings after import
         run: |
-          cat > diagnose_export.gd <<'GDSCRIPT'
-          @tool
-          extends EditorScript
+          SETTINGS_FILE="${HOME}/.config/godot/editor_settings-4.tres"
+          cat > "$SETTINGS_FILE" <<EOF
+          [gd_resource type="EditorSettings" format=3]
 
-          func _run() -> void:
-              print("=== EXPORT DIAGNOSIS ===")
-              var ee := EditorExport.get_singleton()
-              print("Preset count: ", ee.get_export_preset_count())
-              for i in range(ee.get_export_preset_count()):
-                  var p := ee.get_export_preset(i)
-                  print("Preset[%d]: name=%s platform=%s" % [i, p.get_name(), p.get_platform().get_name()])
-                  var err_list := PackedStringArray()
-                  var missing := PackedStringArray()
-                  var ok := p.get_platform().can_export(p, err_list, missing)
-                  print("  can_export(): ", ok)
-                  for e in err_list:
-                      print("  CONFIG ERROR: ", e)
-                  for m in missing:
-                      print("  MISSING TEMPLATE: ", m)
-              print("=== END DIAGNOSIS ===")
-          GDSCRIPT
-          godot --headless --script diagnose_export.gd 2>&1 || true
+          [resource]
+          export/android/java_sdk_path = "${JAVA_HOME}"
+          export/android/android_sdk_path = "${ANDROID_HOME}"
+          export/android/debug_keystore = "${{ steps.keystore.outputs.path }}"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          EOF
+          echo "--- re-asserted settings ---"
+          cat "$SETTINGS_FILE"
 
       - name: Build Android APK (debug)
         run: |
           mkdir -p build/android
-          godot --headless --verbose --export-debug "Android" "${GITHUB_WORKSPACE}/build/android/${EXPORT_NAME}.apk" 2>&1
+          godot --headless --verbose --export-debug "Android" \
+            "${GITHUB_WORKSPACE}/build/android/${EXPORT_NAME}.apk" 2>&1 \
+            | tee export.log
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "--- export exit code: $EXIT_CODE ---"
+          echo "--- any lines between 'configuration errors:' and the 'at:' line ---"
+          awk '/configuration errors:/{flag=1; next} /^   at:/{flag=0} flag' export.log || true
+          exit $EXIT_CODE
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
