@@ -30,6 +30,8 @@
   const finalBestEl = document.getElementById("final-best");
   const overTitleEl = document.getElementById("over-title");
   const overSubEl = document.getElementById("over-sub");
+  const creditsOverlay = document.getElementById("credits-overlay");
+  const creditsScroll = document.getElementById("credits-scroll");
 
   const BOSS_SCORE = 600;
 
@@ -143,12 +145,13 @@
       localStorage.setItem(BEST_KEY, String(state.best));
     }
     bestEl.textContent = "최고 " + state.best;
-    finalScoreEl.textContent = "점수 " + state.score;
-    finalBestEl.textContent = "최고 " + state.best;
-    overTitleEl.textContent = "호르무즈 돌파!";
-    overSubEl.textContent = "늑구, 해협을 건너 자유로.";
-    overSubEl.classList.remove("hidden");
-    setTimeout(() => overOverlay.classList.remove("hidden"), 400);
+    setTimeout(() => {
+      creditsOverlay.classList.remove("hidden");
+      // restart animation each time credits show
+      creditsScroll.style.animation = "none";
+      void creditsScroll.offsetWidth;
+      creditsScroll.style.animation = "";
+    }, 500);
   }
 
   // --- spawning ---
@@ -752,6 +755,11 @@
   });
   document.getElementById("restart-btn").addEventListener("click", (e) => {
     e.stopPropagation();
+    start();
+  });
+  document.getElementById("credits-restart-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    creditsOverlay.classList.add("hidden");
     start();
   });
 
