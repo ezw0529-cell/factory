@@ -173,7 +173,7 @@
       overSubEl.textContent = "\uD83D\uDC94 뜻밖의 반전. 놀랍지만 실화.";
       overSubEl.classList.remove("hidden");
     } else if (reason === "trump") {
-      overTitleEl.textContent = "도람뿌에게 잡혔다";
+      overTitleEl.textContent = "최종 보스에게 잡혔다";
       overSubEl.textContent = "해협은 지켜졌다.";
       overSubEl.classList.remove("hidden");
     } else {
@@ -1357,12 +1357,12 @@
     ctx.arc(0, 0, bt.r - 1, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
-    // text (not rotated — always readable)
-    ctx.fillStyle = "#7a3a0a";
-    ctx.font = "bold 18px 'Apple SD Gothic Neo', sans-serif";
+    // dollar sign (not rotated — always readable)
+    ctx.fillStyle = "#2a5a2a";
+    ctx.font = `bold ${Math.round(bt.r * 1.3)}px sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("관세", bt.x, bt.y);
+    ctx.fillText("$", bt.x, bt.y);
     ctx.textBaseline = "alphabetic";
   }
 
@@ -1760,7 +1760,7 @@
     ctx.fillText("호르무즈 해협", W / 2, H * 0.48);
     ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
     ctx.font = "bold 34px sans-serif";
-    ctx.fillText("최종 관문 — 도람뿌 등장!", W / 2, H * 0.53);
+    ctx.fillText("최종 관문 — 보스 등장!", W / 2, H * 0.53);
   }
 
   function render() {
