@@ -48,7 +48,7 @@
     roadOffset: 0,
     roadSideOffset: 0,
     clouds: seedClouds(),
-    scenery: seedScenery(),
+    scenery: [],
     shake: 0,
     pointerActive: false,
     keyLeft: false,
@@ -1142,5 +1142,6 @@
     start();
   });
 
+  state.scenery = seedScenery();
   render();
 })();
