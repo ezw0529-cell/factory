@@ -123,10 +123,11 @@ button:active {
   background: radial-gradient(ellipse at top, #1a2a3e 0%, #05080f 90%);
   padding: 0;
   overflow: hidden;
-  display: block;
   mask-image: linear-gradient(to bottom, transparent 0%, #000 10%, #000 88%, transparent 100%);
   -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 10%, #000 88%, transparent 100%);
 }
+
+#credits-overlay.hidden { display: none; }
 
 #credits-scroll {
   position: absolute;
