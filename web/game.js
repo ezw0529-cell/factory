@@ -844,7 +844,7 @@
     ctx.fillStyle = "#c2342a";
     ctx.font = "bold 20px 'Apple SD Gothic Neo', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("포장水 40년", bnCx, y + 207);
+    ctx.fillText("튀김소보로", bnCx, y + 207);
 
     // arched windows (2 rows of 2, larger for the bigger facade)
     for (let r = 0; r < 2; r++) {
@@ -1040,6 +1040,48 @@
     ctx.fill();
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(cx - 2, cy + ry * 0.2 + 2, 4, 4);
+
+    // centerfield eagle logo — stylized spread-wing silhouette
+    const elx = cx;
+    const ely = cy - ry * 0.15;
+    ctx.fillStyle = "#f4f4f4";
+    ctx.beginPath();
+    // left wing
+    ctx.moveTo(elx - 2, ely + 2);
+    ctx.quadraticCurveTo(elx - 20, ely - 8, elx - 36, ely - 2);
+    ctx.quadraticCurveTo(elx - 24, ely, elx - 18, ely + 6);
+    ctx.quadraticCurveTo(elx - 10, ely + 4, elx - 2, ely + 6);
+    ctx.closePath();
+    ctx.fill();
+    // right wing (mirror)
+    ctx.beginPath();
+    ctx.moveTo(elx + 2, ely + 2);
+    ctx.quadraticCurveTo(elx + 20, ely - 8, elx + 36, ely - 2);
+    ctx.quadraticCurveTo(elx + 24, ely, elx + 18, ely + 6);
+    ctx.quadraticCurveTo(elx + 10, ely + 4, elx + 2, ely + 6);
+    ctx.closePath();
+    ctx.fill();
+    // body
+    ctx.beginPath();
+    ctx.ellipse(elx, ely + 8, 4, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // head
+    ctx.beginPath();
+    ctx.arc(elx, ely - 2, 4, 0, Math.PI * 2);
+    ctx.fill();
+    // beak
+    ctx.fillStyle = "#ffb84a";
+    ctx.beginPath();
+    ctx.moveTo(elx, ely - 2);
+    ctx.lineTo(elx + 6, ely - 1);
+    ctx.lineTo(elx, ely + 2);
+    ctx.closePath();
+    ctx.fill();
+    // eye
+    ctx.fillStyle = "#1a1a1a";
+    ctx.beginPath();
+    ctx.arc(elx - 1, ely - 3, 0.8, 0, Math.PI * 2);
+    ctx.fill();
 
     // scoreboard on the near edge of the ring (larger)
     const sbSide = s.side === "L" ? 1 : -1; // face toward the road side
