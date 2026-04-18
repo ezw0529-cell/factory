@@ -33,7 +33,7 @@
   const creditsOverlay = document.getElementById("credits-overlay");
   const creditsScroll = document.getElementById("credits-scroll");
 
-  const BOSS_SCORE = 220;
+  const BOSS_SCORE = 440;
 
   const state = {
     running: false,
@@ -144,6 +144,8 @@
     state.sungsimdangSpawned = false;
     state.stadiumSpawned = false;
     state.reveal = null;
+    // zoo gate behind the wolf at the very start
+    state.scenery.push({ kind: "zoo_gate", x: 0, y: 260, w: W, h: 320 });
     scoreEl.textContent = "점수 0";
   }
 
@@ -287,8 +289,8 @@
       state.sungsimdangSpawned = true;
       spawnSungsimdang();
     }
-    // mid landmark: baseball stadium
-    if (!state.stadiumSpawned && state.phase === "normal" && state.distance > 4200) {
+    // mid landmark: baseball stadium (spaced out with doubled boss timer)
+    if (!state.stadiumSpawned && state.phase === "normal" && state.distance > 6500) {
       state.stadiumSpawned = true;
       spawnStadium();
     }
@@ -1109,8 +1111,81 @@
     }
   }
 
+  function drawZooGate(s) {
+    const x = s.x, y = s.y, w = s.w, h = s.h;
+    // ground/plaza behind the gate
+    ctx.fillStyle = "#8a8268";
+    ctx.fillRect(x, y + h - 80, w, 80);
+    // cage compound behind (dark bars over field of animal dots)
+    ctx.fillStyle = "#2a4a2a";
+    ctx.fillRect(x, y, w, h - 80);
+    // tiny enclosure structures / cages in the background
+    ctx.fillStyle = "#6a5a3a";
+    for (let i = 0; i < 6; i++) {
+      const bx = x + 30 + i * ((w - 60) / 6);
+      ctx.fillRect(bx, y + 40, 40, 40);
+      // bar lines
+      ctx.strokeStyle = "rgba(0,0,0,0.45)"; ctx.lineWidth = 1;
+      for (let b = 0; b < 5; b++) {
+        ctx.beginPath();
+        ctx.moveTo(bx + 4 + b * 8, y + 44);
+        ctx.lineTo(bx + 4 + b * 8, y + 76);
+        ctx.stroke();
+      }
+    }
+    // gate side pillars
+    ctx.fillStyle = "#4a3528";
+    ctx.fillRect(x + W * 0.16, y + h - 180, 22, 180);
+    ctx.fillRect(x + W * 0.82 - 22, y + h - 180, 22, 180);
+    // pillar caps
+    ctx.fillStyle = "#6a4a38";
+    ctx.fillRect(x + W * 0.16 - 4, y + h - 190, 30, 14);
+    ctx.fillRect(x + W * 0.82 - 26, y + h - 190, 30, 14);
+    // arch beam
+    ctx.fillStyle = "#4a3528";
+    ctx.fillRect(x + W * 0.16, y + h - 200, W * 0.66, 26);
+    // arch sign (cream background, big "동물원")
+    ctx.fillStyle = "#f6ecd2";
+    roundRect(x + W * 0.22, y + h - 198, W * 0.56, 22, 3);
+    ctx.fill();
+    ctx.strokeStyle = "#4a3528"; ctx.lineWidth = 2;
+    ctx.strokeRect(x + W * 0.22, y + h - 198, W * 0.56, 22);
+    ctx.fillStyle = "#2a1a10";
+    ctx.font = "bold 22px 'Apple SD Gothic Neo', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("동물원", x + W / 2, y + h - 181);
+    // entrance (the gap between pillars)
+    ctx.fillStyle = "#3a3036";
+    ctx.fillRect(x + W * 0.18 + 22, y + h - 174, W * 0.64 - 44, 174);
+    // broken cage door (askew) — the wolf left this way
+    ctx.fillStyle = "#2a2a30";
+    ctx.save();
+    ctx.translate(x + W * 0.5 - 30, y + h - 140);
+    ctx.rotate(-0.28);
+    ctx.fillRect(0, 0, 60, 90);
+    // bars
+    ctx.strokeStyle = "#1a1a1a"; ctx.lineWidth = 2;
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath();
+      ctx.moveTo(6 + i * 12, 4);
+      ctx.lineTo(6 + i * 12, 86);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // "탈출!" spray on gate
+    ctx.fillStyle = "#d62a2a";
+    ctx.font = "bold 26px 'Apple SD Gothic Neo', sans-serif";
+    ctx.save();
+    ctx.translate(x + W * 0.32, y + h - 40);
+    ctx.rotate(-0.12);
+    ctx.fillText("탈출!", 0, 0);
+    ctx.restore();
+  }
+
   function drawScenery(s) {
-    if (s.kind === "sungsimdang_big") {
+    if (s.kind === "zoo_gate") {
+      drawZooGate(s);
+    } else if (s.kind === "sungsimdang_big") {
       drawSungsimdangBig(s);
     } else if (s.kind === "stadium_big") {
       drawStadiumBig(s);
