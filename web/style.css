@@ -1,0 +1,120 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: #0d141f;
+  color: #f4f4f4;
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Noto Sans KR", "Malgun Gothic", sans-serif;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100vw;
+  max-height: 100vh;
+  background: linear-gradient(#8ac4e7 0%, #cfe4f1 70%, #6b8f53 70%, #6b8f53 100%);
+  image-rendering: pixelated;
+}
+
+#hud {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 20px;
+  font-size: 28px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 0 #000, 0 0 8px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 10, 20, 0.72);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 3;
+  text-align: center;
+  gap: 16px;
+}
+
+.overlay.hidden { display: none; }
+
+h1 {
+  font-size: clamp(48px, 12vw, 96px);
+  color: #ffd84a;
+  text-shadow: 0 4px 0 #000, 0 0 12px rgba(255, 216, 74, 0.6);
+  letter-spacing: 4px;
+}
+
+h2 {
+  font-size: clamp(44px, 10vw, 80px);
+  color: #ff7a4a;
+  text-shadow: 0 4px 0 #000;
+}
+
+.tag {
+  font-size: clamp(14px, 3.6vw, 20px);
+  color: #cde;
+  margin-bottom: 12px;
+}
+
+.hint {
+  font-size: clamp(13px, 3.4vw, 18px);
+  color: #aab;
+  margin-bottom: 20px;
+  max-width: 520px;
+  line-height: 1.5;
+}
+
+#final-score, #final-best {
+  font-size: clamp(22px, 5vw, 34px);
+  font-weight: 700;
+}
+
+#final-best { color: #ffd84a; }
+
+button {
+  font-family: inherit;
+  font-size: clamp(20px, 5vw, 28px);
+  font-weight: 800;
+  color: #1a1a1a;
+  background: #ffd84a;
+  border: none;
+  border-radius: 14px;
+  padding: 18px 36px;
+  margin-top: 12px;
+  cursor: pointer;
+  box-shadow: 0 6px 0 #b08a12, 0 10px 24px rgba(0, 0, 0, 0.3);
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+
+button:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #b08a12, 0 4px 10px rgba(0, 0, 0, 0.3);
+}
