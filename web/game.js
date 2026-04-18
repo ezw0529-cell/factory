@@ -308,8 +308,10 @@
         b.fireTimer = 0.75;
       }
       // boss body does NOT collide — only bullets do
-      // victory when boss exits opposite side
-      if (b.x - b.w / 2 > W + 40 || b.x + b.w / 2 < -40) {
+      // victory when boss exits the opposite side it came from
+      const exitedRight = b.dir > 0 && b.x - b.w / 2 > W + 40;
+      const exitedLeft = b.dir < 0 && b.x + b.w / 2 < -40;
+      if (exitedRight || exitedLeft) {
         state.phase = "victory";
         state.boss = null;
         victory();
