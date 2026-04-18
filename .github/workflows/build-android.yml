@@ -82,9 +82,11 @@ jobs:
       - name: Write Godot editor settings
         run: |
           mkdir -p ~/.config/godot
-          # Godot 4.4 reads editor_settings-4.4.tres; 4.3 reads editor_settings-4.tres.
-          # Write both so we are version-agnostic.
-          SETTINGS_BODY=$(cat <<EOF
+          # Godot 4.4 keys the file by point release (editor_settings-4.4.tres).
+          # 4.3 uses editor_settings-4.tres. Write the canonical file directly
+          # (NO heredoc-into-variable tricks — those can collapse newlines)
+          # then copy to the other names to be version-agnostic.
+          cat > "$HOME/.config/godot/editor_settings-4.4.tres" <<EOF
           [gd_resource type="EditorSettings" format=3]
 
           [resource]
@@ -94,12 +96,13 @@ jobs:
           export/android/debug_keystore_user = "androiddebugkey"
           export/android/debug_keystore_pass = "android"
           EOF
-          )
-          for f in editor_settings-4.tres editor_settings-4.3.tres editor_settings-4.4.tres; do
-            echo "$SETTINGS_BODY" > "$HOME/.config/godot/$f"
-          done
-          echo "::group::editor_settings-4.4.tres"
-          cat ~/.config/godot/editor_settings-4.4.tres
+          cp "$HOME/.config/godot/editor_settings-4.4.tres" "$HOME/.config/godot/editor_settings-4.tres"
+          cp "$HOME/.config/godot/editor_settings-4.4.tres" "$HOME/.config/godot/editor_settings-4.3.tres"
+          echo "::group::editor_settings-4.4.tres (verbatim)"
+          cat "$HOME/.config/godot/editor_settings-4.4.tres"
+          echo "::endgroup::"
+          echo "::group::wc of all settings files"
+          wc -l "$HOME"/.config/godot/editor_settings-*.tres
           echo "::endgroup::"
           echo "::group::env"
           echo "JAVA_HOME=$JAVA_HOME"
@@ -145,7 +148,7 @@ jobs:
 
       - name: Re-assert editor settings after import
         run: |
-          SETTINGS_BODY=$(cat <<EOF
+          cat > "$HOME/.config/godot/editor_settings-4.4.tres" <<EOF
           [gd_resource type="EditorSettings" format=3]
 
           [resource]
@@ -155,14 +158,23 @@ jobs:
           export/android/debug_keystore_user = "androiddebugkey"
           export/android/debug_keystore_pass = "android"
           EOF
-          )
-          for f in editor_settings-4.tres editor_settings-4.3.tres editor_settings-4.4.tres; do
-            echo "$SETTINGS_BODY" > "$HOME/.config/godot/$f"
-          done
+          cp "$HOME/.config/godot/editor_settings-4.4.tres" "$HOME/.config/godot/editor_settings-4.tres"
+          cp "$HOME/.config/godot/editor_settings-4.4.tres" "$HOME/.config/godot/editor_settings-4.3.tres"
+          echo "::group::re-asserted editor_settings-4.4.tres"
+          cat "$HOME/.config/godot/editor_settings-4.4.tres"
+          echo "::endgroup::"
 
       - name: Build Android APK (debug)
         run: |
           mkdir -p build/android
+          echo "::group::settings file Godot will load (RIGHT before invocation)"
+          echo "--- editor_settings-4.4.tres ---"
+          cat "$HOME/.config/godot/editor_settings-4.4.tres"
+          echo "--- SHA256 ---"
+          sha256sum "$HOME/.config/godot/editor_settings-4.4.tres"
+          echo "--- listing ~/.config/godot/ ---"
+          ls -la "$HOME/.config/godot/"
+          echo "::endgroup::"
           set +e
           godot --headless --path "${GITHUB_WORKSPACE}" --verbose \
             --export-debug "Android" \
@@ -172,8 +184,8 @@ jobs:
           echo "::group::export exit code"
           echo "$EXIT"
           echo "::endgroup::"
-          echo "::group::full export.log"
-          cat export.log
+          echo "::group::settings file AFTER Godot ran (in case it overwrote)"
+          cat "$HOME/.config/godot/editor_settings-4.4.tres"
           echo "::endgroup::"
           exit $EXIT
 
