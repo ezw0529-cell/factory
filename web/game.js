@@ -58,6 +58,7 @@
     boss: null,
     bossAnnounce: 0,
     bullets: [],
+    sungsimdangSpawned: false,
   };
 
   bestEl.textContent = "최고 " + state.best;
@@ -84,9 +85,7 @@
     const side = Math.random() < 0.5 ? "L" : "R";
     const roll = Math.random();
     let kind, w, h;
-    if (roll < 0.18) {
-      kind = "sungsimdang"; w = 120; h = 140;
-    } else if (roll < 0.55) {
+    if (roll < 0.45) {
       kind = "sign"; w = 90; h = 100;
     } else if (roll < 0.85) {
       kind = "building"; w = 110; h = 100 + Math.random() * 60;
@@ -97,6 +96,15 @@
       ? 10 + Math.random() * (W * 0.18 - 20 - w)
       : W - W * 0.18 + 10 + Math.random() * (W * 0.18 - 20 - w);
     return { kind, x, y, w, h, label: DAEJEON_SIGNS[Math.floor(Math.random() * DAEJEON_SIGNS.length)] };
+  }
+
+  function spawnSungsimdang() {
+    // big landmark — only spawned once per run, early
+    const side = Math.random() < 0.5 ? "L" : "R";
+    const w = 132;
+    const h = 340;
+    const x = side === "L" ? -2 : W - w + 2;  // hug the sidewalk edge
+    state.scenery.push({ kind: "sungsimdang_big", x, y: -h - 40, w, h, label: null });
   }
 
   function seedScenery() {
@@ -122,6 +130,7 @@
     state.boss = null;
     state.bossAnnounce = 0;
     state.bullets = [];
+    state.sungsimdangSpawned = false;
     scoreEl.textContent = "점수 0";
   }
 
@@ -196,9 +205,9 @@
   }
 
   function spawnTanker() {
-    const w = 220 + Math.random() * 120;
-    const h = 90;
-    const x = 80 + Math.random() * (W - 160 - w);
+    const w = 110;
+    const h = 240;
+    const x = 90 + Math.random() * (W - 180 - w);
     state.obstacles.push({ type: 4, sub: null, x, y: -h - 40, w, h, passed: false, phase: Math.random() * Math.PI * 2 });
   }
 
@@ -249,29 +258,42 @@
     const py1 = PLAYER_Y - PLAYER_H / 2 + 28;
     const py2 = PLAYER_Y + PLAYER_H / 2 - 18;
 
+    // early landmark: big 성심당 once, a few seconds in
+    if (!state.sungsimdangSpawned && state.phase === "normal" && state.distance > 2600) {
+      state.sungsimdangSpawned = true;
+      spawnSungsimdang();
+    }
+
     // phase transition into boss
     if (state.phase === "normal" && state.score >= BOSS_SCORE) {
       state.phase = "approach";
       state.phaseT = 0;
       state.bossAnnounce = 2.5;
+      // clear any land obstacles — the world changes to the strait
+      state.obstacles = [];
+      state.bullets = [];
+      // let the first tanker come in soon after the banner appears
+      state.spawnTimer = 0.9;
     }
     if (state.bossAnnounce > 0) state.bossAnnounce = Math.max(0, state.bossAnnounce - dt);
-    if (state.phase === "approach") {
+    if (state.phase === "approach" || state.phase === "boss" || state.phase === "victory") {
       state.phaseT += dt;
-      if (state.phaseT >= 1.6) {
+    }
+    if (state.phase === "approach") {
+      if (state.phaseT >= 6.0) {
         state.phase = "boss";
         state.phaseT = 0;
-        // keep any in-flight obstacles (they'll scroll off)
-        // switch remaining land obstacles to tankers visually? no — just let them drift out
         state.boss = {
           x: W / 2,
           y: -200,
           baseX: W / 2,
           w: 260,
           h: 230,
-          vy: 80,
+          vy: 85,
           wobbleT: 0,
           fireTimer: 0.8,
+          dead: false,
+          deadT: 0,
         };
       }
     }
@@ -298,36 +320,53 @@
     for (const o of state.obstacles) o.y += state.scroll * dt;
     state.obstacles = state.obstacles.filter((o) => o.y < H + 60);
 
-    // boss: slow descent through center + periodic 관세 bullets
+    // boss: slow descent through center, fire while high, then drop
     if (state.phase === "boss" && state.boss) {
       const b = state.boss;
-      b.wobbleT += dt;
-      b.x = b.baseX + Math.sin(b.wobbleT * 0.7) * 110;
-      b.y += b.vy * dt;
-      b.fireTimer -= dt;
-      if (b.fireTimer <= 0) {
-        const bx = b.x;
-        const by = b.y + b.h * 0.5;
-        const dx = p.x - bx;
-        const dy = PLAYER_Y - by;
-        const mag = Math.hypot(dx, dy) || 1;
-        const speed = 520;
-        state.bullets.push({
-          x: bx, y: by,
-          vx: dx / mag * speed,
-          vy: dy / mag * speed,
-          r: 26,
-          spin: 0,
-        });
-        b.fireTimer = 0.75;
-      }
-      // boss body does NOT collide — only bullets do
-      // victory when boss descends past the bottom
-      if (b.y > H + 40) {
-        state.phase = "victory";
-        state.boss = null;
-        victory();
-        return;
+      const KILL_LINE = H * 0.42;
+      if (!b.dead) {
+        b.wobbleT += dt;
+        b.x = b.baseX + Math.sin(b.wobbleT * 0.7) * 110;
+        b.y += b.vy * dt;
+        // trigger mario-death when crossing the kill line
+        if (b.y > KILL_LINE) {
+          b.dead = true;
+          b.deadT = 0;
+        } else {
+          // only fire while above the kill line
+          b.fireTimer -= dt;
+          if (b.fireTimer <= 0) {
+            const bx = b.x;
+            const by = b.y + b.h * 0.5;
+            const dx = p.x - bx;
+            const dy = PLAYER_Y - by;
+            const mag = Math.hypot(dx, dy) || 1;
+            const speed = 520;
+            state.bullets.push({
+              x: bx, y: by,
+              vx: dx / mag * speed,
+              vy: dy / mag * speed,
+              r: 26,
+              spin: 0,
+            });
+            b.fireTimer = 0.8;
+          }
+        }
+      } else {
+        // mario-death sequence: brief hover then fast drop
+        b.deadT += dt;
+        if (b.deadT < 0.35) {
+          b.y -= 260 * dt;
+        } else {
+          b.y += 1700 * dt * Math.min(1, (b.deadT - 0.35) * 3);
+        }
+        // once death animation is done, just call it a win
+        if (b.deadT > 0.85) {
+          state.phase = "victory";
+          state.boss = null;
+          victory();
+          return;
+        }
       }
     }
 
@@ -714,40 +753,141 @@
     ctx.fill();
   }
 
-  function drawScenery(s) {
-    if (s.kind === "sungsimdang") {
-      // red-cream bakery with "성심당" sign and bread icon
-      ctx.fillStyle = "#e6d8b8";
-      roundRect(s.x, s.y, s.w, s.h, 6); ctx.fill();
-      // red roof / awning
-      ctx.fillStyle = "#c2342a";
-      ctx.fillRect(s.x - 4, s.y, s.w + 8, 26);
-      // signboard
-      ctx.fillStyle = "#fff4dc";
-      roundRect(s.x + 6, s.y + 30, s.w - 12, 28, 4); ctx.fill();
-      ctx.fillStyle = "#c2342a";
-      ctx.font = "bold 20px 'Apple SD Gothic Neo', sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("성심당", s.x + s.w / 2, s.y + 50);
-      // window
-      ctx.fillStyle = "#f5b3a3";
-      roundRect(s.x + 14, s.y + 70, s.w - 28, s.h - 88, 6); ctx.fill();
-      // bread icon
-      ctx.fillStyle = "#c49465";
+  function drawSungsimdangBig(s) {
+    const x = s.x, y = s.y, w = s.w, h = s.h;
+    // mansard roof (dark gray-green metal)
+    ctx.fillStyle = "#4a5558";
+    ctx.beginPath();
+    ctx.moveTo(x + 8, y + 70);
+    ctx.lineTo(x + 20, y + 20);
+    ctx.lineTo(x + w - 20, y + 20);
+    ctx.lineTo(x + w - 8, y + 70);
+    ctx.closePath();
+    ctx.fill();
+    // roof highlight stripes
+    ctx.strokeStyle = "#6a7578"; ctx.lineWidth = 1;
+    for (let i = 0; i < 4; i++) {
+      const ry = y + 30 + i * 10;
       ctx.beginPath();
-      ctx.ellipse(s.x + s.w / 2, s.y + s.h - 30, 22, 14, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "rgba(0,0,0,0.25)";
-      ctx.lineWidth = 1.5;
-      for (let i = -2; i <= 2; i++) {
+      ctx.moveTo(x + 14 + i * 2, ry);
+      ctx.lineTo(x + w - 14 - i * 2, ry);
+      ctx.stroke();
+    }
+    // dormer windows on roof
+    for (let i = 0; i < 2; i++) {
+      const dx = x + 32 + i * 56;
+      ctx.fillStyle = "#2a2f35";
+      roundRect(dx, y + 34, 20, 24, 3); ctx.fill();
+      ctx.fillStyle = "#6aa3c6";
+      ctx.fillRect(dx + 3, y + 37, 14, 14);
+    }
+    // turret (right edge)
+    ctx.fillStyle = "#4a5558";
+    ctx.beginPath();
+    ctx.moveTo(x + w - 24, y + 6);
+    ctx.lineTo(x + w - 8, y - 20);
+    ctx.lineTo(x + w + 4, y + 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#8a6a2a";
+    ctx.fillRect(x + w - 22, y + 6, 22, 30);
+    ctx.fillStyle = "#6aa3c6";
+    ctx.fillRect(x + w - 18, y + 12, 14, 16);
+
+    // brick main body
+    ctx.fillStyle = "#a84a2a";
+    ctx.fillRect(x + 6, y + 70, w - 12, h - 70 - 40);
+    // brick texture (horizontal stripes)
+    ctx.strokeStyle = "rgba(0,0,0,0.18)"; ctx.lineWidth = 1;
+    for (let by = y + 80; by < y + h - 40; by += 8) {
+      ctx.beginPath();
+      ctx.moveTo(x + 6, by);
+      ctx.lineTo(x + w - 6, by);
+      ctx.stroke();
+    }
+
+    // round stained-glass window (top-center)
+    const rwY = y + 100;
+    ctx.fillStyle = "#6a3020";
+    ctx.beginPath(); ctx.arc(x + w / 2, rwY, 18, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#e6b03a";
+    ctx.beginPath(); ctx.arc(x + w / 2, rwY, 14, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#6a3020"; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x + w / 2 - 14, rwY); ctx.lineTo(x + w / 2 + 14, rwY);
+    ctx.moveTo(x + w / 2, rwY - 14); ctx.lineTo(x + w / 2, rwY + 14);
+    ctx.stroke();
+
+    // vertical 성심당 signboard on the facade
+    const sbX = x + w - 32;
+    const sbY = y + 130;
+    ctx.fillStyle = "#1a1a1a";
+    roundRect(sbX, sbY, 22, 140, 2); ctx.fill();
+    ctx.fillStyle = "#ffd84a";
+    ctx.font = "bold 18px 'Apple SD Gothic Neo', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("성", sbX + 11, sbY + 28);
+    ctx.fillText("심", sbX + 11, sbY + 64);
+    ctx.fillText("당", sbX + 11, sbY + 100);
+
+    // horizontal cream banner across facade
+    ctx.fillStyle = "#f4ecd8";
+    roundRect(x + 10, y + 140, w - 50, 26, 2); ctx.fill();
+    ctx.strokeStyle = "#3a2a20"; ctx.lineWidth = 1;
+    ctx.strokeRect(x + 10, y + 140, w - 50, 26);
+    ctx.fillStyle = "#c2342a";
+    ctx.font = "bold 10px 'Apple SD Gothic Neo', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("포장水 40년", x + 10 + (w - 50) / 2, y + 156);
+
+    // arched windows (2 rows of 2)
+    for (let r = 0; r < 2; r++) {
+      for (let c = 0; c < 2; c++) {
+        const wx = x + 14 + c * ((w - 60) / 2);
+        const wy = y + 180 + r * 60;
+        ctx.fillStyle = "#2a2a30";
         ctx.beginPath();
-        ctx.moveTo(s.x + s.w / 2 + i * 6, s.y + s.h - 40);
-        ctx.lineTo(s.x + s.w / 2 + i * 6, s.y + s.h - 20);
+        ctx.moveTo(wx, wy + 40);
+        ctx.lineTo(wx, wy + 12);
+        ctx.quadraticCurveTo(wx + 12, wy - 4, wx + 24, wy + 12);
+        ctx.lineTo(wx + 24, wy + 40);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#e8d8b8";
+        ctx.fillRect(wx + 2, wy + 14, 20, 24);
+        ctx.strokeStyle = "#3a2a20"; ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(wx + 12, wy + 10); ctx.lineTo(wx + 12, wy + 38);
+        ctx.moveTo(wx + 2, wy + 24); ctx.lineTo(wx + 22, wy + 24);
         ctx.stroke();
       }
-      // door
-      ctx.fillStyle = "#3a2a20";
-      ctx.fillRect(s.x + s.w / 2 - 10, s.y + s.h - 8, 20, 8);
+    }
+
+    // awnings at bottom (dark gray)
+    ctx.fillStyle = "#2a2a30";
+    ctx.fillRect(x + 4, y + h - 46, w - 8, 14);
+    // awning stripes
+    ctx.fillStyle = "#fff4dc";
+    ctx.font = "bold 8px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("CAKE BOUTIQUE", x + w / 2, y + h - 36);
+
+    // glass storefront
+    ctx.fillStyle = "#f6ecd2";
+    ctx.fillRect(x + 4, y + h - 32, w - 8, 22);
+    ctx.fillStyle = "#8a6a2a";
+    ctx.fillRect(x + w - 26, y + h - 32, 20, 22);
+    ctx.fillStyle = "#2a1a10";
+    ctx.fillRect(x + w - 24, y + h - 30, 16, 20);
+
+    // sidewalk base
+    ctx.fillStyle = "#3a2a1a";
+    ctx.fillRect(x, y + h - 10, w, 10);
+  }
+
+  function drawScenery(s) {
+    if (s.kind === "sungsimdang_big") {
+      drawSungsimdangBig(s);
     } else if (s.kind === "sign") {
       // green street sign on pole
       ctx.fillStyle = "#4a4a4a";
@@ -988,70 +1128,100 @@
   }
 
   function drawTanker(o) {
-    // top-down oil tanker: black hull, red smokestack, orange deck
+    // vertical top-down ship: pointy bow at top, bridge/stack at bottom
     const x = o.x, y = o.y, w = o.w, h = o.h;
-    // water wake behind
-    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    const cxT = x + w / 2;
+
+    // bow wake (V-shape ahead of the ship)
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
     ctx.beginPath();
-    ctx.moveTo(x + 10, y - 6);
-    ctx.lineTo(x + w / 2 - 20, y - 28);
-    ctx.lineTo(x + w / 2 + 20, y - 28);
-    ctx.lineTo(x + w - 10, y - 6);
+    ctx.moveTo(cxT, y - 6);
+    ctx.lineTo(cxT - 26, y - 34);
+    ctx.lineTo(cxT, y - 16);
+    ctx.lineTo(cxT + 26, y - 34);
     ctx.closePath();
     ctx.fill();
-    // hull (rounded at bow, flat at stern)
-    ctx.fillStyle = "#1a1a22";
+    ctx.fillStyle = "rgba(255,255,255,0.25)";
     ctx.beginPath();
-    ctx.moveTo(x + 2, y + 6);
-    ctx.lineTo(x + w / 2 - 14, y);
-    ctx.lineTo(x + w / 2 + 14, y);
-    ctx.lineTo(x + w - 2, y + 6);
-    ctx.lineTo(x + w - 2, y + h - 4);
-    ctx.lineTo(x + 2, y + h - 4);
+    ctx.ellipse(cxT, y + 6, w / 2 + 6, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // hull (pointy bow, rounded stern)
+    ctx.fillStyle = "#1a1f28";
+    ctx.beginPath();
+    ctx.moveTo(x + 4, y + 36);
+    ctx.quadraticCurveTo(cxT, y - 14, x + w - 4, y + 36);
+    ctx.lineTo(x + w - 2, y + h - 10);
+    ctx.quadraticCurveTo(cxT, y + h + 4, x + 2, y + h - 10);
     ctx.closePath();
     ctx.fill();
-    // deck
-    ctx.fillStyle = "#c26a1f";
-    roundRect(x + 10, y + 12, w - 20, h - 28, 4); ctx.fill();
-    // deck tanks (orange cylinders top-down = circles)
-    ctx.fillStyle = "#e88a2a";
-    const tanks = Math.max(2, Math.floor(w / 70));
-    for (let i = 0; i < tanks; i++) {
-      const tx = x + 24 + i * ((w - 48) / tanks) + ((w - 48) / tanks) / 2;
+
+    // deck surface
+    ctx.fillStyle = "#d4a070";
+    ctx.beginPath();
+    ctx.moveTo(x + 12, y + 44);
+    ctx.quadraticCurveTo(cxT, y + 6, x + w - 12, y + 44);
+    ctx.lineTo(x + w - 10, y + h - 38);
+    ctx.lineTo(x + 10, y + h - 38);
+    ctx.closePath();
+    ctx.fill();
+
+    // center pipe running bow-to-stern
+    ctx.strokeStyle = "#6a6a6a"; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cxT, y + 50);
+    ctx.lineTo(cxT, y + h - 44);
+    ctx.stroke();
+
+    // oil tanks (4 big orange circles down the deck)
+    const tankCount = 4;
+    for (let i = 0; i < tankCount; i++) {
+      const ty = y + 60 + i * ((h - 110) / (tankCount - 1));
+      ctx.fillStyle = "#ff8a2a";
       ctx.beginPath();
-      ctx.arc(tx, y + h / 2 - 2, 14, 0, Math.PI * 2);
+      ctx.arc(cxT, ty, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#8a4a10"; ctx.lineWidth = 2;
+      ctx.stroke();
+      // rivet highlight
+      ctx.fillStyle = "#ffd08a";
+      ctx.beginPath();
+      ctx.arc(cxT - 5, ty - 5, 3, 0, Math.PI * 2);
       ctx.fill();
     }
-    // piping
-    ctx.strokeStyle = "#888"; ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(x + 20, y + h / 2 - 2);
-    ctx.lineTo(x + w - 20, y + h / 2 - 2);
-    ctx.stroke();
-    // bridge (stern)
+
+    // bridge/superstructure at stern
     ctx.fillStyle = "#e8e0c8";
-    roundRect(x + 14, y + h - 26, 48, 20, 3); ctx.fill();
+    roundRect(x + 20, y + h - 36, w - 40, 22, 4); ctx.fill();
     ctx.fillStyle = "#6aa3c6";
-    ctx.fillRect(x + 18, y + h - 22, 40, 6);
-    // red smokestack on bridge
-    ctx.fillStyle = "#c63030";
-    ctx.fillRect(x + 28, y + h - 14, 10, 10);
+    ctx.fillRect(x + 26, y + h - 32, w - 52, 7);
+
+    // red smokestack
+    ctx.fillStyle = "#c62020";
+    ctx.fillRect(cxT - 7, y + h - 22, 14, 16);
     ctx.fillStyle = "#1a1a1a";
-    ctx.fillRect(x + 30, y + h - 15, 6, 3);
-    // stripe + label
+    ctx.fillRect(cxT - 8, y + h - 23, 16, 4);
+
+    // hull side stripe
     ctx.fillStyle = "#ffd84a";
-    ctx.fillRect(x + 68, y + h - 22, w - 88, 14);
-    ctx.fillStyle = "#1a1a1a";
-    ctx.font = "bold 12px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("유조선", x + 68 + (w - 88) / 2, y + h - 11);
+    ctx.fillRect(x + 8, y + h * 0.58, w - 16, 8);
+    ctx.strokeStyle = "rgba(0,0,0,0.3)";
+    ctx.strokeRect(x + 8, y + h * 0.58, w - 16, 8);
   }
 
   function drawBoss() {
     const b = state.boss;
     if (!b) return;
+    ctx.save();
     const cx = b.x;
-    const y = b.y;
+    let y = b.y;
+    if (b.dead) {
+      // rotate + wobble during fall
+      const rot = Math.min(b.deadT * 2.2, Math.PI);
+      ctx.translate(b.x, b.y + b.h * 0.5);
+      ctx.rotate(rot);
+      ctx.translate(-b.x, -(b.y + b.h * 0.5));
+    }
     // body / suit
     ctx.fillStyle = "#1b2a48";
     roundRect(cx - b.w / 2 + 20, y + b.h * 0.55, b.w - 40, b.h * 0.45, 20);
@@ -1105,14 +1275,13 @@
     ctx.fillStyle = "#3a1f1f";
     roundRect(cx - 18, y + b.h * 0.48, 36, 10, 4);
     ctx.fill();
-    // MAGA-ish hat
+    // red cap (no text)
     ctx.fillStyle = "#d62a2a";
     roundRect(cx - 70, y + b.h * 0.05, 130, 26, 8);
     ctx.fill();
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 18px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("NUGU", cx, y + b.h * 0.05 + 19);
+    // cap brim
+    ctx.fillStyle = "#8a1a1a";
+    ctx.fillRect(cx - 70, y + b.h * 0.05 + 24, 130, 5);
 
     // arms out (blocking)
     ctx.fillStyle = "#1b2a48";
@@ -1123,6 +1292,30 @@
     ctx.fillStyle = "#f2a56a";
     ctx.beginPath(); ctx.arc(cx - b.w / 2 - 6, y + b.h * 0.75, 22, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(cx + b.w / 2 + 6, y + b.h * 0.75, 22, 0, Math.PI * 2); ctx.fill();
+
+    ctx.restore();
+
+    // death flash + stars above (drawn in screen space, not rotated)
+    if (b.dead) {
+      const pt = b.deadT;
+      if (pt < 0.3) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, 0.7 - pt * 2)})`;
+        ctx.fillRect(0, 0, W, H);
+      }
+      // stars orbit the head during the hover
+      if (pt < 0.5) {
+        const headY = b.y + b.h * 0.4;
+        ctx.fillStyle = "#ffd84a";
+        ctx.font = "bold 34px sans-serif";
+        ctx.textAlign = "center";
+        for (let i = 0; i < 5; i++) {
+          const a = pt * 8 + i * (Math.PI * 2 / 5);
+          const sx = b.x + Math.cos(a) * 90;
+          const sy = headY + Math.sin(a) * 30;
+          ctx.fillText("★", sx, sy);
+        }
+      }
+    }
   }
 
   function drawBossAnnounce() {
