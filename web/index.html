@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <meta name="theme-color" content="#0d141f" />
 <title>늑구런 — Neukgu Run</title>
-<link rel="stylesheet" href="style.css?v=7" />
+<link rel="stylesheet" href="style.css?v=9" />
 </head>
 <body>
   <div id="stage">
@@ -17,7 +17,7 @@
     </div>
     <div id="start-overlay" class="overlay">
       <h1>늑구런</h1>
-      <p class="tag">대전 5월드 탈출 10일간의 질주</p>
+      <p class="tag">대전 동물원 탈출 10일간의 질주</p>
       <p class="hint">화면을 손가락으로 쓸어서 늑구를 좌우로 조종 · 사육사·그물을 피해 계속 북쪽으로!</p>
       <button id="start-btn">탈출 시작!</button>
     </div>
@@ -34,7 +34,7 @@
         <h2 class="cr-title">— 엔딩 —</h2>
         <p class="cr-big">호르무즈를 돌파한 늑구,</p>
         <p class="cr-big">그러나 향한 곳은…</p>
-        <p class="cr-heading">🏞️ 대전 5월드 동물원</p>
+        <p class="cr-heading">🏞️ 대전 동물원</p>
         <p class="cr-narr">10일 만의 귀환.</p>
         <p class="cr-twist">…알고보니</p>
         <p class="cr-twist-big">국내 최고급 사파리형<br/>넓은 사육장</p>
@@ -43,8 +43,116 @@
         <p class="cr-tag">늑준표하고 할 수 있지.</p>
         <div class="cr-divider"></div>
         <p class="cr-heading">Cast</p>
+        <div class="cr-portrait">
+          <svg viewBox="0 0 160 180" xmlns="http://www.w3.org/2000/svg" aria-label="늑구 초상">
+            <defs>
+              <clipPath id="neukguFrame"><circle cx="80" cy="90" r="76"/></clipPath>
+              <radialGradient id="neukguBg" cx="50%" cy="35%" r="80%">
+                <stop offset="0%" stop-color="#5a4a3a"/>
+                <stop offset="100%" stop-color="#20170f"/>
+              </radialGradient>
+            </defs>
+            <circle cx="80" cy="90" r="78" fill="#111"/>
+            <g clip-path="url(#neukguFrame)">
+              <!-- warm dark background -->
+              <rect width="160" height="180" fill="url(#neukguBg)"/>
+              <!-- red cage bars as a nod to the transport photo -->
+              <g opacity="0.45">
+                <rect x="8"   y="0" width="5" height="180" fill="#8a2a22"/>
+                <rect x="30"  y="0" width="5" height="180" fill="#8a2a22"/>
+                <rect x="52"  y="0" width="5" height="180" fill="#8a2a22"/>
+                <rect x="130" y="0" width="5" height="180" fill="#8a2a22"/>
+                <rect x="152" y="0" width="5" height="180" fill="#8a2a22"/>
+              </g>
+
+              <!-- front legs + paws (cream, dark socks) -->
+              <ellipse cx="60"  cy="172" rx="11" ry="14" fill="#cdb48d"/>
+              <ellipse cx="100" cy="172" rx="11" ry="14" fill="#cdb48d"/>
+              <ellipse cx="60"  cy="178" rx="13" ry="6"  fill="#2a2218"/>
+              <ellipse cx="100" cy="178" rx="13" ry="6"  fill="#2a2218"/>
+
+              <!-- chest / shoulders (cream with darker guard hairs) -->
+              <ellipse cx="80" cy="155" rx="52" ry="28" fill="#b8a07a"/>
+              <!-- saddle — darker charcoal/brown down the shoulders -->
+              <path d="M30 140 Q50 120 80 130 Q110 120 130 140 Q118 158 80 152 Q42 158 30 140"
+                    fill="#5a4a38"/>
+              <!-- cream chest bib -->
+              <ellipse cx="80" cy="152" rx="26" ry="12" fill="#e8d8b4"/>
+              <ellipse cx="80" cy="146" rx="18" ry="7" fill="#f5e8c8"/>
+
+              <!-- neck base -->
+              <ellipse cx="80" cy="120" rx="38" ry="22" fill="#c0a982"/>
+              <!-- neck ruff (darker guard hair around) -->
+              <path d="M42 118 Q50 100 80 98 Q110 100 118 118 Q108 128 80 126 Q52 128 42 118"
+                    fill="#6a5a42"/>
+
+              <!-- head base (tan) -->
+              <ellipse cx="80" cy="88" rx="40" ry="38" fill="#c9b089"/>
+              <!-- darker crown / top of head (saddle extension) -->
+              <path d="M42 78 Q60 50 80 52 Q100 50 118 78 Q112 92 80 86 Q48 92 42 78"
+                    fill="#7a6548"/>
+              <!-- lighter forehead blaze -->
+              <path d="M66 72 Q80 60 94 72 Q92 88 80 86 Q68 88 66 72" fill="#d6bf98"/>
+
+              <!-- ears: outer tan with dark rim, inner pink -->
+              <path d="M46 58 L36 14 L66 54 Z" fill="#7a6548"/>
+              <path d="M114 58 L124 14 L94 54 Z" fill="#7a6548"/>
+              <path d="M48 52 L42 20 L60 50 Z" fill="#cdb48d"/>
+              <path d="M112 52 L118 20 L100 50 Z" fill="#cdb48d"/>
+              <path d="M50 48 L46 24 L56 46 Z" fill="#e6c8a6"/>
+              <path d="M110 48 L114 24 L104 46 Z" fill="#e6c8a6"/>
+              <path d="M52 44 L50 28 L54 42 Z" fill="#d69a7a"/>
+              <path d="M108 44 L110 28 L106 42 Z" fill="#d69a7a"/>
+
+              <!-- cheek tufts -->
+              <path d="M36 102 Q26 116 40 122 Q52 120 52 108 Z" fill="#d6bf98"/>
+              <path d="M124 102 Q134 116 120 122 Q108 120 108 108 Z" fill="#d6bf98"/>
+
+              <!-- light cream face mask -->
+              <path d="M54 84 Q80 74 106 84 Q108 114 80 120 Q52 114 54 84" fill="#dec7a0"/>
+              <!-- muzzle (creamy) -->
+              <ellipse cx="80" cy="112" rx="18" ry="18" fill="#ede1c2"/>
+              <ellipse cx="80" cy="122" rx="14" ry="10" fill="#f6ecd2"/>
+
+              <!-- dark eye mask shadows (subtle) -->
+              <ellipse cx="62" cy="82" rx="10" ry="7" fill="#5a4530" opacity="0.45"/>
+              <ellipse cx="98" cy="82" rx="10" ry="7" fill="#5a4530" opacity="0.45"/>
+
+              <!-- eyes: amber, piercing -->
+              <ellipse cx="62" cy="84" rx="6.5" ry="7" fill="#fff"/>
+              <ellipse cx="98" cy="84" rx="6.5" ry="7" fill="#fff"/>
+              <ellipse cx="62" cy="85" rx="5.5" ry="6" fill="#d99120"/>
+              <ellipse cx="98" cy="85" rx="5.5" ry="6" fill="#d99120"/>
+              <ellipse cx="62" cy="85" rx="3"   ry="4" fill="#7a4a10"/>
+              <ellipse cx="98" cy="85" rx="3"   ry="4" fill="#7a4a10"/>
+              <ellipse cx="62" cy="86" rx="1.6" ry="3.5" fill="#1a0f08"/>
+              <ellipse cx="98" cy="86" rx="1.6" ry="3.5" fill="#1a0f08"/>
+              <circle cx="64" cy="82" r="1.3" fill="#fff"/>
+              <circle cx="100" cy="82" r="1.3" fill="#fff"/>
+
+              <!-- brow ridges -->
+              <path d="M50 72 Q60 68 70 74" stroke="#3a2a1a" stroke-width="2" fill="none" stroke-linecap="round"/>
+              <path d="M90 74 Q100 68 110 72" stroke="#3a2a1a" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+              <!-- nose -->
+              <path d="M72 104 Q80 100 88 104 Q88 112 80 114 Q72 112 72 104 Z" fill="#121212"/>
+              <path d="M78 106 L80 112 L82 106" stroke="#555" stroke-width="0.5" fill="none"/>
+
+              <!-- mouth -->
+              <path d="M80 114 Q80 124 70 126" stroke="#1a1a1a" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+              <path d="M80 114 Q80 124 90 126" stroke="#1a1a1a" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+              <!-- chin cream -->
+              <ellipse cx="80" cy="130" rx="10" ry="4" fill="#f6ecd2"/>
+            </g>
+            <!-- gold frame -->
+            <circle cx="80" cy="90" r="76" fill="none" stroke="#ffd84a" stroke-width="3"/>
+            <circle cx="80" cy="90" r="72" fill="none" stroke="rgba(0,0,0,0.4)" stroke-width="1"/>
+          </svg>
+          <p class="cr-portrait-cap">늑구 (도련님)</p>
+          <p class="cr-portrait-sub">— 2026년 4월, 산을 넘은 남자 —</p>
+        </div>
         <p class="cr-role">늑구 (도련님) ···················· 본인</p>
-        <p class="cr-role">사육사 ······························ 5월드 직원분들</p>
+        <p class="cr-role">사육사 ······························ 동물원 직원분들</p>
         <p class="cr-role">암컷 늑대(추정) ·················· 수컷이었음</p>
         <p class="cr-role">최종 보스 ··························· 도람뿌</p>
         <p class="cr-role">조연 ·································· 강원도 산림 2,000ha</p>
@@ -63,6 +171,6 @@
     </div>
    </div>
   </div>
-  <script src="game.js?v=8"></script>
+  <script src="game.js?v=9"></script>
 </body>
 </html>

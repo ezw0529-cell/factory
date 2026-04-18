@@ -33,7 +33,7 @@
   const creditsOverlay = document.getElementById("credits-overlay");
   const creditsScroll = document.getElementById("credits-scroll");
 
-  const BOSS_SCORE = 220;
+  const BOSS_SCORE = 120;
 
   const state = {
     running: false,
@@ -251,9 +251,10 @@
     if (state.bossAnnounce > 0) state.bossAnnounce = Math.max(0, state.bossAnnounce - dt);
     if (state.phase === "approach") {
       state.phaseT += dt;
-      if (state.phaseT >= 2.2 && state.obstacles.length === 0) {
+      if (state.phaseT >= 1.6) {
         state.phase = "boss";
         state.phaseT = 0;
+        state.obstacles = [];
         const fromLeft = Math.random() < 0.5;
         state.boss = {
           x: fromLeft ? -180 : W + 180,
@@ -788,7 +789,7 @@
     } else if (o.sub === "rescue") {
       uniform = "#e0742a"; cap = "#ffffff"; accent = "#d62a2a"; label = "119";
     } else {
-      label = "5월드";
+      label = "동물원";
     }
     // shadow
     ctx.fillStyle = "rgba(0,0,0,0.25)";
