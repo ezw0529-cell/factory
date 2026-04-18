@@ -599,164 +599,149 @@
   }
 
   function drawPlayer() {
+    // Top-down (helicopter) view of a wolf running upward.
+    // No face details — from directly above you'd see the back + head tip.
     const p = state.player;
-    const bob = Math.sin(p.bob * 14) * 3;
-    const y = PLAYER_Y - PLAYER_H / 2 + bob;
+    const bob = Math.sin(p.bob * 14) * 2;
     const cx = p.x;
+    const cy = PLAYER_Y + bob;
 
-    const FUR = "#b8b0a4";        // soft wolf gray-brown
-    const FUR_DARK = "#807769";   // back/tail darker
-    const BELLY = "#f3ece0";      // cream belly/muzzle
-    const EAR_PINK = "#ffb5c2";   // cute pink inner ear
-    const PAW = "#908578";
+    const FUR = "#c4aa80";
+    const FUR_MID = "#967d57";
+    const FUR_DARK = "#5a4630";
+    const CREAM = "#e8d9b4";
+    const PAW = "#28201a";
 
-    // shadow
-    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    // cast shadow on the ground
+    ctx.fillStyle = "rgba(0,0,0,0.28)";
     ctx.beginPath();
-    ctx.ellipse(cx, PLAYER_Y + PLAYER_H / 2 + 8, PLAYER_W / 2 - 6, 10, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + 4, cy + PLAYER_H * 0.55, PLAYER_W * 0.42, 9, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // fluffy tail (3 bumps, animated sway)
-    const tailSway = Math.sin(p.bob * 10) * 6;
+    // tail — long bushy plume trailing behind (below body since head faces up)
+    const tailSway = Math.sin(p.bob * 10) * 5;
     ctx.fillStyle = FUR_DARK;
     ctx.beginPath();
-    ctx.arc(cx + tailSway, y + PLAYER_H + 10, 16, 0, Math.PI * 2);
-    ctx.arc(cx + tailSway * 0.6, y + PLAYER_H - 4, 19, 0, Math.PI * 2);
-    ctx.arc(cx + tailSway * 0.3, y + PLAYER_H - 20, 17, 0, Math.PI * 2);
+    ctx.ellipse(cx + tailSway * 0.8, cy + PLAYER_H * 0.55, 12, 34, 0, 0, Math.PI * 2);
     ctx.fill();
-    // tail tip highlight
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = FUR_MID;
     ctx.beginPath();
-    ctx.arc(cx + tailSway, y + PLAYER_H + 14, 8, 0, Math.PI * 2);
+    ctx.ellipse(cx + tailSway, cy + PLAYER_H * 0.45, 9, 28, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // tail tip
+    ctx.fillStyle = "#1a1208";
+    ctx.beginPath();
+    ctx.arc(cx + tailSway * 1.2, cy + PLAYER_H * 0.78, 7, 0, Math.PI * 2);
     ctx.fill();
 
-    // hind legs (behind body)
-    const legSwing = Math.sin(p.bob * 22) * 7;
+    // hind legs — splayed outward from lower body
+    const gait = Math.sin(p.bob * 22);
     ctx.fillStyle = PAW;
-    roundRect(cx - 38, y + PLAYER_H * 0.72 + legSwing, 16, 22, 6); ctx.fill();
-    roundRect(cx + 22, y + PLAYER_H * 0.72 - legSwing, 16, 22, 6); ctx.fill();
+    ctx.save();
+    ctx.translate(cx - PLAYER_W * 0.32, cy + PLAYER_H * 0.22 + gait * 5);
+    ctx.rotate(-0.25);
+    roundRect(-6, 0, 12, 26, 5); ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.translate(cx + PLAYER_W * 0.32, cy + PLAYER_H * 0.22 - gait * 5);
+    ctx.rotate(0.25);
+    roundRect(-6, 0, 12, 26, 5); ctx.fill();
+    ctx.restore();
 
-    // body (rounded, plump)
+    // body (elongated oval along the vertical axis — wolf oriented up)
+    const bodyRx = PLAYER_W * 0.38;
+    const bodyRy = PLAYER_H * 0.34;
     ctx.fillStyle = FUR;
     ctx.beginPath();
-    ctx.ellipse(cx, y + PLAYER_H * 0.6, PLAYER_W / 2 - 8, PLAYER_H * 0.34, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy + 8, bodyRx, bodyRy, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // belly patch
-    ctx.fillStyle = BELLY;
-    ctx.beginPath();
-    ctx.ellipse(cx, y + PLAYER_H * 0.68, PLAYER_W / 2 - 22, PLAYER_H * 0.22, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // front legs
-    ctx.fillStyle = PAW;
-    roundRect(cx - 30, y + PLAYER_H * 0.5 - legSwing, 15, 22, 6); ctx.fill();
-    roundRect(cx + 15, y + PLAYER_H * 0.5 + legSwing, 15, 22, 6); ctx.fill();
-
-    // neck ruff (fluffy collar)
+    // saddle — darker stripe along the spine
     ctx.fillStyle = FUR_DARK;
     ctx.beginPath();
-    ctx.arc(cx - 28, y + PLAYER_H * 0.38, 14, 0, Math.PI * 2);
-    ctx.arc(cx - 10, y + PLAYER_H * 0.36, 16, 0, Math.PI * 2);
-    ctx.arc(cx + 10, y + PLAYER_H * 0.36, 16, 0, Math.PI * 2);
-    ctx.arc(cx + 28, y + PLAYER_H * 0.38, 14, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy + 4, bodyRx * 0.55, bodyRy * 0.92, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // head (big round kawaii)
+    // subtle mid-tone band blending saddle into body
+    ctx.fillStyle = FUR_MID;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 10, bodyRx * 0.78, bodyRy * 0.55, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // front legs — splayed outward from upper body
+    ctx.fillStyle = PAW;
+    ctx.save();
+    ctx.translate(cx - PLAYER_W * 0.32, cy - PLAYER_H * 0.08 - gait * 5);
+    ctx.rotate(-0.3);
+    roundRect(-6, -22, 12, 24, 5); ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.translate(cx + PLAYER_W * 0.32, cy - PLAYER_H * 0.08 + gait * 5);
+    ctx.rotate(0.3);
+    roundRect(-6, -22, 12, 24, 5); ctx.fill();
+    ctx.restore();
+
+    // neck — slight taper between body and head
     ctx.fillStyle = FUR;
     ctx.beginPath();
-    ctx.ellipse(cx, y + PLAYER_H * 0.22, 46, 42, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy - PLAYER_H * 0.18, bodyRx * 0.58, 14, 0, 0, Math.PI * 2);
     ctx.fill();
-
-    // ears (pointier, with pink inner)
     ctx.fillStyle = FUR_DARK;
-    // left
     ctx.beginPath();
-    ctx.moveTo(cx - 40, y + 8);
-    ctx.quadraticCurveTo(cx - 34, y - 26, cx - 18, y + 4);
-    ctx.quadraticCurveTo(cx - 20, y + 14, cx - 40, y + 8);
-    ctx.fill();
-    // right
-    ctx.beginPath();
-    ctx.moveTo(cx + 40, y + 8);
-    ctx.quadraticCurveTo(cx + 34, y - 26, cx + 18, y + 4);
-    ctx.quadraticCurveTo(cx + 20, y + 14, cx + 40, y + 8);
-    ctx.fill();
-    // inner pink
-    ctx.fillStyle = EAR_PINK;
-    ctx.beginPath();
-    ctx.moveTo(cx - 32, y + 6);
-    ctx.quadraticCurveTo(cx - 30, y - 14, cx - 22, y + 4);
-    ctx.quadraticCurveTo(cx - 26, y + 10, cx - 32, y + 6);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(cx + 32, y + 6);
-    ctx.quadraticCurveTo(cx + 30, y - 14, cx + 22, y + 4);
-    ctx.quadraticCurveTo(cx + 26, y + 10, cx + 32, y + 6);
+    ctx.ellipse(cx, cy - PLAYER_H * 0.18, bodyRx * 0.38, 10, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // face mask (lighter patch)
-    ctx.fillStyle = BELLY;
+    // head — smaller oval pointing up
+    const headCy = cy - PLAYER_H * 0.36;
+    ctx.fillStyle = FUR;
     ctx.beginPath();
-    ctx.ellipse(cx, y + PLAYER_H * 0.18, 28, 22, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, headCy, 26, 30, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // dark top-of-head
+    ctx.fillStyle = FUR_DARK;
+    ctx.beginPath();
+    ctx.ellipse(cx, headCy - 2, 16, 20, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // snout (front, with muzzle)
-    ctx.fillStyle = BELLY;
+    // ears — two pointed triangles on the upper sides of the head
+    ctx.fillStyle = FUR_DARK;
     ctx.beginPath();
-    ctx.ellipse(cx, y + PLAYER_H * 0.06, 18, 16, 0, 0, Math.PI * 2);
+    ctx.moveTo(cx - 22, headCy - 14);
+    ctx.lineTo(cx - 26, headCy - 30);
+    ctx.lineTo(cx - 12, headCy - 20);
+    ctx.closePath();
     ctx.fill();
-    // snout shadow
-    ctx.fillStyle = "rgba(0,0,0,0.05)";
     ctx.beginPath();
-    ctx.ellipse(cx, y + PLAYER_H * 0.085, 18, 16, 0, 0, Math.PI * 2);
+    ctx.moveTo(cx + 22, headCy - 14);
+    ctx.lineTo(cx + 26, headCy - 30);
+    ctx.lineTo(cx + 12, headCy - 20);
+    ctx.closePath();
     ctx.fill();
-
-    // nose (heart-ish)
-    ctx.fillStyle = "#1a1a1a";
+    // ear inner cream
+    ctx.fillStyle = CREAM;
     ctx.beginPath();
-    ctx.ellipse(cx - 4, y - 4, 5, 4, 0, 0, Math.PI * 2);
-    ctx.ellipse(cx + 4, y - 4, 5, 4, 0, 0, Math.PI * 2);
-    ctx.ellipse(cx, y, 8, 5, 0, 0, Math.PI * 2);
+    ctx.moveTo(cx - 20, headCy - 16);
+    ctx.lineTo(cx - 23, headCy - 26);
+    ctx.lineTo(cx - 14, headCy - 20);
+    ctx.closePath();
     ctx.fill();
-
-    // tongue
-    ctx.fillStyle = "#ff7a9c";
-    roundRect(cx - 5, y + 6, 10, 12, 4);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(0,0,0,0.2)"; ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(cx, y + 8); ctx.lineTo(cx, y + 16);
-    ctx.stroke();
-
-    // eyes — big, sparkly, kawaii
-    const eyeY = y + PLAYER_H * 0.2;
-    // white
-    ctx.fillStyle = "#ffffff";
-    ctx.beginPath();
-    ctx.ellipse(cx - 16, eyeY, 10, 12, 0, 0, Math.PI * 2);
-    ctx.ellipse(cx + 16, eyeY, 10, 12, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // pupil
-    ctx.fillStyle = "#222";
-    ctx.beginPath();
-    ctx.ellipse(cx - 16, eyeY + 2, 6, 8, 0, 0, Math.PI * 2);
-    ctx.ellipse(cx + 16, eyeY + 2, 6, 8, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // sparkle
-    ctx.fillStyle = "#ffffff";
-    ctx.beginPath();
-    ctx.arc(cx - 14, eyeY - 1, 2.5, 0, Math.PI * 2);
-    ctx.arc(cx + 18, eyeY - 1, 2.5, 0, Math.PI * 2);
-    ctx.arc(cx - 18, eyeY + 4, 1.2, 0, Math.PI * 2);
-    ctx.arc(cx + 14, eyeY + 4, 1.2, 0, Math.PI * 2);
+    ctx.moveTo(cx + 20, headCy - 16);
+    ctx.lineTo(cx + 23, headCy - 26);
+    ctx.lineTo(cx + 14, headCy - 20);
+    ctx.closePath();
     ctx.fill();
 
-    // blush
-    ctx.fillStyle = "rgba(255, 150, 170, 0.55)";
+    // snout tip — cream wedge pointing up, tiny black nose
+    ctx.fillStyle = CREAM;
     ctx.beginPath();
-    ctx.ellipse(cx - 28, y + PLAYER_H * 0.26, 8, 5, 0, 0, Math.PI * 2);
-    ctx.ellipse(cx + 28, y + PLAYER_H * 0.26, 8, 5, 0, 0, Math.PI * 2);
+    ctx.moveTo(cx - 9, headCy - 18);
+    ctx.quadraticCurveTo(cx, headCy - 36, cx + 9, headCy - 18);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#141410";
+    ctx.beginPath();
+    ctx.arc(cx, headCy - 30, 3, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -1070,15 +1055,21 @@
       }
     }
 
-    // team banner on the bowl edge
-    const bnx = cx - 50;
-    const bny = cy + ry - 22;
-    ctx.fillStyle = "#ff7a2a";
-    roundRect(bnx, bny, 100, 16, 3); ctx.fill();
+    // team banner on the bowl edge (larger & bolder)
+    const bnw = 230;
+    const bnh = 34;
+    const bnx = cx - bnw / 2;
+    const bny = cy + ry - bnh - 10;
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 10px 'Apple SD Gothic Neo', sans-serif";
+    roundRect(bnx - 3, bny - 3, bnw + 6, bnh + 6, 6); ctx.fill();
+    ctx.fillStyle = "#ff7a2a";
+    roundRect(bnx, bny, bnw, bnh, 5); ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 22px 'Apple SD Gothic Neo', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("하나 이겼으 파크", bnx + 50, bny + 12);
+    ctx.textBaseline = "middle";
+    ctx.fillText("하나 이겼으 파크", cx, bny + bnh / 2);
+    ctx.textBaseline = "alphabetic";
 
     // tiny spectators as dots around the rim
     ctx.fillStyle = "#ff7a2a";
