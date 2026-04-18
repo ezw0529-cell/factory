@@ -181,12 +181,12 @@
   function spawnObstacle() {
     const kind = Math.random();
     let type, w, h, sub = null;
-    if (kind < 0.5) {
+    if (kind < 0.4) {
       type = 0; w = 110; h = 150;
       sub = PERSON_KINDS[Math.floor(Math.random() * PERSON_KINDS.length)];
-    } else if (kind < 0.75) {
+    } else if (kind < 0.6) {
       type = 1; w = 220 + Math.random() * 160; h = 70;
-    } else if (kind < 0.88) {
+    } else if (kind < 0.72) {
       type = 2; w = 110; h = 110;
     } else {
       type = 3; w = 120; h = 150;
@@ -255,16 +255,15 @@
         state.phase = "boss";
         state.phaseT = 0;
         state.obstacles = [];
-        const fromLeft = Math.random() < 0.5;
         state.boss = {
-          x: fromLeft ? -180 : W + 180,
-          y: 220,
+          x: W / 2,
+          y: -200,
+          baseX: W / 2,
           w: 260,
           h: 230,
-          vx: (fromLeft ? 1 : -1) * 170,
-          vy: 55,
-          fireTimer: 0.6,
-          dir: fromLeft ? 1 : -1,
+          vy: 80,
+          wobbleT: 0,
+          fireTimer: 0.8,
         };
       }
     }
@@ -285,10 +284,11 @@
     for (const o of state.obstacles) o.y += state.scroll * dt;
     state.obstacles = state.obstacles.filter((o) => o.y < H + 60);
 
-    // boss: diagonal cross + periodic 관세 bullets
+    // boss: slow descent through center + periodic 관세 bullets
     if (state.phase === "boss" && state.boss) {
       const b = state.boss;
-      b.x += b.vx * dt;
+      b.wobbleT += dt;
+      b.x = b.baseX + Math.sin(b.wobbleT * 0.7) * 110;
       b.y += b.vy * dt;
       b.fireTimer -= dt;
       if (b.fireTimer <= 0) {
@@ -308,10 +308,8 @@
         b.fireTimer = 0.75;
       }
       // boss body does NOT collide — only bullets do
-      // victory when boss exits the opposite side it came from
-      const exitedRight = b.dir > 0 && b.x - b.w / 2 > W + 40;
-      const exitedLeft = b.dir < 0 && b.x + b.w / 2 < -40;
-      if (exitedRight || exitedLeft) {
+      // victory when boss descends past the bottom
+      if (b.y > H + 40) {
         state.phase = "victory";
         state.boss = null;
         victory();
