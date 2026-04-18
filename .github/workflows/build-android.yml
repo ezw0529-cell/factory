@@ -68,6 +68,22 @@ jobs:
           done
           echo "::endgroup::"
 
+      - name: Install Android gradle build template into project
+        run: |
+          TEMPLATE_DIR="${HOME}/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}"
+          BUILD_DIR="${GITHUB_WORKSPACE}/android/build"
+          mkdir -p "${BUILD_DIR}"
+          unzip -oq "${TEMPLATE_DIR}/android_source.zip" -d "${BUILD_DIR}"
+          # Ensure gradlew is executable.
+          if [ -f "${BUILD_DIR}/gradlew" ]; then
+            chmod +x "${BUILD_DIR}/gradlew"
+          fi
+          # Marker file required by Godot to recognize the installed template.
+          echo -n "" > "${BUILD_DIR}/.gdignore"
+          echo "::group::android/build/ contents"
+          ls -la "${BUILD_DIR}/" | head -40
+          echo "::endgroup::"
+
       - name: Generate debug keystore
         id: keystore
         run: |
@@ -188,6 +204,33 @@ jobs:
           cat "$HOME/.config/godot/editor_settings-4.4.tres"
           echo "::endgroup::"
           exit $EXIT
+
+      - name: Post diagnostic summary
+        if: always()
+        run: |
+          {
+            echo "## 늑구런 build diagnostic"
+            echo ""
+            echo "### Editor settings Godot loaded"
+            echo '```'
+            cat "$HOME/.config/godot/editor_settings-4.4.tres" 2>/dev/null || echo "(file missing)"
+            echo '```'
+            echo ""
+            echo "### JDK / SDK resolution"
+            echo "- JAVA_HOME: \`${JAVA_HOME}\`"
+            echo "- ANDROID_HOME: \`${ANDROID_HOME}\`"
+            echo "- javac: \`$(ls -la "$JAVA_HOME/bin/javac" 2>&1)\`"
+            echo ""
+            echo "### export.log tail (last 120 lines)"
+            echo '```'
+            tail -120 export.log 2>/dev/null || echo "(no export.log)"
+            echo '```'
+            echo ""
+            echo "### import1.log tail (last 40 lines)"
+            echo '```'
+            tail -40 import1.log 2>/dev/null || echo "(no import1.log)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Always upload logs
         if: always()
