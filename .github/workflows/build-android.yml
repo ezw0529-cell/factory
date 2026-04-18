@@ -35,6 +35,40 @@ jobs:
             -dname "CN=Android Debug,O=Android,C=US" \
             -validity 9999 -deststoretype pkcs12
 
+      - name: Resolve JDK and Android SDK paths
+        id: sdk
+        run: |
+          # Find a usable Java SDK. JAVA_HOME may be unset in the container.
+          JDK_PATH="${JAVA_HOME:-}"
+          if [ -z "$JDK_PATH" ] || [ ! -x "$JDK_PATH/bin/javac" ]; then
+            for candidate in \
+              /usr/lib/jvm/java-17-openjdk-amd64 \
+              /usr/lib/jvm/java-11-openjdk-amd64 \
+              /usr/lib/jvm/default-java \
+              /opt/java/openjdk; do
+              if [ -x "$candidate/bin/javac" ]; then
+                JDK_PATH="$candidate"
+                break
+              fi
+            done
+          fi
+          if [ -z "$JDK_PATH" ] || [ ! -x "$JDK_PATH/bin/javac" ]; then
+            # Fallback: derive from `which javac`
+            JAVAC_BIN="$(command -v javac || true)"
+            if [ -n "$JAVAC_BIN" ]; then
+              JDK_PATH="$(dirname "$(dirname "$(readlink -f "$JAVAC_BIN")")")"
+            fi
+          fi
+          if [ -z "$JDK_PATH" ] || [ ! -x "$JDK_PATH/bin/javac" ]; then
+            echo "::error::No JDK with javac found in container"
+            exit 1
+          fi
+          SDK_PATH="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/lib/android-sdk}}"
+          echo "jdk=$JDK_PATH" >> "$GITHUB_OUTPUT"
+          echo "sdk=$SDK_PATH" >> "$GITHUB_OUTPUT"
+          echo "Resolved JDK: $JDK_PATH"
+          echo "Resolved Android SDK: $SDK_PATH"
+
       - name: Configure Godot editor settings
         run: |
           mkdir -p ~/.config/godot
@@ -42,11 +76,14 @@ jobs:
           [gd_resource type="EditorSettings" format=3]
 
           [resource]
-          export/android/android_sdk_path = "${ANDROID_HOME:-/usr/lib/android-sdk}"
+          export/android/java_sdk_path = "${{ steps.sdk.outputs.jdk }}"
+          export/android/android_sdk_path = "${{ steps.sdk.outputs.sdk }}"
           export/android/debug_keystore = "$(pwd)/debug.keystore"
           export/android/debug_keystore_user = "androiddebugkey"
           export/android/debug_keystore_pass = "android"
           EOF
+          echo "--- editor_settings-4.tres ---"
+          cat ~/.config/godot/editor_settings-4.tres
 
       - name: Import project (priming)
         continue-on-error: true
