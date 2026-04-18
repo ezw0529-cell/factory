@@ -656,16 +656,19 @@
     ctx.ellipse(cx, cy + 8, bodyRx, bodyRy, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // saddle — darker stripe along the spine
-    ctx.fillStyle = FUR_DARK;
+    // soft shoulder shading — darker at the front (shoulders),
+    // fading toward the rump. gradient makes it look like fur,
+    // not a patterned shape.
+    const backGrad = ctx.createRadialGradient(
+      cx, cy - bodyRy * 0.3, 4,
+      cx, cy + bodyRy * 0.2, bodyRy * 1.1
+    );
+    backGrad.addColorStop(0, FUR_MID);
+    backGrad.addColorStop(0.6, "rgba(150,125,87,0.45)");
+    backGrad.addColorStop(1, "rgba(150,125,87,0)");
+    ctx.fillStyle = backGrad;
     ctx.beginPath();
-    ctx.ellipse(cx, cy + 4, bodyRx * 0.55, bodyRy * 0.92, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // subtle mid-tone band blending saddle into body
-    ctx.fillStyle = FUR_MID;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy + 10, bodyRx * 0.78, bodyRy * 0.55, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy + 4, bodyRx * 0.9, bodyRy * 0.95, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // front legs — splayed outward from upper body
@@ -810,27 +813,38 @@
     ctx.moveTo(x + w / 2, rwY - 14); ctx.lineTo(x + w / 2, rwY + 14);
     ctx.stroke();
 
-    // vertical 선심당 signboard on the facade (bigger/bolder)
-    const sbX = x + w - 46;
+    // visible portion of the building (since it may extend off-screen)
+    const onLeft = (x + w / 2) < W / 2;
+    const vLeft = Math.max(x, 4);
+    const vRight = Math.min(x + w, W - 4);
+    const vCenter = (vLeft + vRight) / 2;
+
+    // vertical 선심당 signboard — anchor on the inward (visible) edge
+    const sbW = 36;
+    const sbX = onLeft ? vRight - sbW - 4 : vLeft + 4;
     const sbY = y + 160;
     ctx.fillStyle = "#1a1a1a";
-    roundRect(sbX, sbY, 36, 220, 3); ctx.fill();
+    roundRect(sbX, sbY, sbW, 220, 3); ctx.fill();
     ctx.fillStyle = "#ffd84a";
     ctx.font = "bold 30px 'Apple SD Gothic Neo', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("선", sbX + 18, sbY + 46);
-    ctx.fillText("심", sbX + 18, sbY + 108);
-    ctx.fillText("당", sbX + 18, sbY + 170);
+    ctx.fillText("선", sbX + sbW / 2, sbY + 46);
+    ctx.fillText("심", sbX + sbW / 2, sbY + 108);
+    ctx.fillText("당", sbX + sbW / 2, sbY + 170);
 
-    // horizontal cream banner across facade (bigger)
+    // horizontal cream banner — centered on the visible half of the facade
+    const bnWidth = Math.min(vRight - vLeft - sbW - 20, 170);
+    const bnOffset = onLeft ? -(sbW / 2 + 4) : (sbW / 2 + 4);
+    const bnCx = vCenter + bnOffset;
+    const bnLeft = bnCx - bnWidth / 2;
     ctx.fillStyle = "#f4ecd8";
-    roundRect(x + 14, y + 180, w - 70, 40, 3); ctx.fill();
+    roundRect(bnLeft, y + 180, bnWidth, 40, 3); ctx.fill();
     ctx.strokeStyle = "#3a2a20"; ctx.lineWidth = 2;
-    ctx.strokeRect(x + 14, y + 180, w - 70, 40);
+    ctx.strokeRect(bnLeft, y + 180, bnWidth, 40);
     ctx.fillStyle = "#c2342a";
     ctx.font = "bold 20px 'Apple SD Gothic Neo', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("포장水 40년", x + 14 + (w - 70) / 2, y + 207);
+    ctx.fillText("포장水 40년", bnCx, y + 207);
 
     // arched windows (2 rows of 2, larger for the bigger facade)
     for (let r = 0; r < 2; r++) {
@@ -1055,10 +1069,11 @@
       }
     }
 
-    // team banner on the bowl edge (larger & bolder)
+    // team banner — clamp to the on-screen half so '하나' isn't clipped
     const bnw = 230;
     const bnh = 34;
-    const bnx = cx - bnw / 2;
+    const bnCx = Math.max(bnw / 2 + 12, Math.min(W - bnw / 2 - 12, cx));
+    const bnx = bnCx - bnw / 2;
     const bny = cy + ry - bnh - 10;
     ctx.fillStyle = "#ffffff";
     roundRect(bnx - 3, bny - 3, bnw + 6, bnh + 6, 6); ctx.fill();
@@ -1068,7 +1083,7 @@
     ctx.font = "bold 22px 'Apple SD Gothic Neo', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("하나 이겼으 파크", cx, bny + bnh / 2);
+    ctx.fillText("하나 이겼으 파크", bnCx, bny + bnh / 2);
     ctx.textBaseline = "alphabetic";
 
     // tiny spectators as dots around the rim
