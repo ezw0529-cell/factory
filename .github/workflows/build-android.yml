@@ -37,6 +37,12 @@ jobs:
           yes | sdkmanager --licenses > /dev/null || true
           sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
 
+      - name: Install xvfb and runtime deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libfontconfig1 libxcursor1 libxinerama1 \
+            libxi6 libxrandr2 libasound2 libpulse0
+
       - name: Download Godot
         run: |
           GODOT_ZIP="Godot_v${GODOT_VERSION}-${GODOT_STATUS}_linux.x86_64.zip"
@@ -55,11 +61,8 @@ jobs:
           unzip -q "${TPZ}"
           mv templates/* "${TEMPLATE_DIR}/"
           rmdir templates
-          echo "--- template dir contents ---"
-          ls -la "${TEMPLATE_DIR}/" | head -30
-          echo "--- android templates present? ---"
-          ls -la "${TEMPLATE_DIR}/android_debug.apk" "${TEMPLATE_DIR}/android_release.apk" \
-                 "${TEMPLATE_DIR}/android_source.zip" 2>&1 || true
+          echo "--- template dir ---"
+          ls -la "${TEMPLATE_DIR}/" | grep -E "android|version" || true
 
       - name: Generate debug keystore
         id: keystore
@@ -70,14 +73,12 @@ jobs:
             -storepass android \
             -dname "CN=Android Debug,O=Android,C=US" \
             -validity 9999 -deststoretype pkcs12
-          keytool -list -keystore "${KEYSTORE_PATH}" -storepass android | head -20
           echo "path=${KEYSTORE_PATH}" >> "$GITHUB_OUTPUT"
 
       - name: Write Godot editor settings
         run: |
           mkdir -p ~/.config/godot
-          SETTINGS_FILE="${HOME}/.config/godot/editor_settings-4.tres"
-          cat > "$SETTINGS_FILE" <<EOF
+          cat > ~/.config/godot/editor_settings-4.tres <<EOF
           [gd_resource type="EditorSettings" format=3]
 
           [resource]
@@ -88,34 +89,35 @@ jobs:
           export/android/debug_keystore_pass = "android"
           export/android/force_system_user = false
           export/android/shutdown_adb_on_exit = true
-          export/android/one_click_deploy_clear_previous_install = false
           EOF
           echo "--- editor_settings-4.tres ---"
-          cat "$SETTINGS_FILE"
-          echo "--- env ---"
-          echo "JAVA_HOME=$JAVA_HOME"
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          java -version 2>&1
-          echo "--- javac present? ---"
-          ls -la "$JAVA_HOME/bin/javac"
-          echo "--- android sdk layout ---"
-          ls -la "$ANDROID_HOME/build-tools/"
-          ls -la "$ANDROID_HOME/platforms/"
-          ls -la "$ANDROID_HOME/platform-tools/" | head -5
+          cat ~/.config/godot/editor_settings-4.tres
+          echo "--- Android SDK layout ---"
+          ls "$ANDROID_HOME/build-tools/"
+          ls "$ANDROID_HOME/platforms/"
 
-      - name: Import project (populate .godot cache)
+      - name: Initialize Godot editor via xvfb (full plugin init)
         run: |
-          godot --headless --import 2>&1 | tee import.log || true
-          godot --headless --import 2>&1 | tee -a import.log || true
-          echo "--- .godot dir ---"
-          ls -la .godot/ 2>&1 || echo "(.godot not created)"
-          echo "--- script parse errors (if any) ---"
-          grep -E "SCRIPT ERROR|Parse Error|Failed to load" import.log || echo "(no parse errors)"
+          # Running the full editor with xvfb ensures every export plugin
+          # (Android, etc.) registers its properties and resolves paths.
+          # --quit-after is in frames: 300 ~= 5 seconds at 60 FPS.
+          set +e
+          xvfb-run -a --server-args="-screen 0 1280x720x24" \
+            godot --editor --verbose --quit-after 400 2>&1 \
+            | tee editor-init.log
+          EXIT=$?
+          echo "--- editor init exit code: $EXIT ---"
+          echo "--- .godot cache dir ---"
+          ls -la .godot/ 2>&1 || echo "(.godot NOT created — project failed to import)"
+          echo "--- script errors in init log ---"
+          grep -E "SCRIPT ERROR|Parse Error|Failed to load" editor-init.log || echo "(none)"
+          echo "--- any error lines in init log ---"
+          grep -E "^ERROR|^WARNING" editor-init.log | head -40 || true
 
-      - name: Re-assert editor settings after import
+      - name: Re-assert editor settings after init
         run: |
-          SETTINGS_FILE="${HOME}/.config/godot/editor_settings-4.tres"
-          cat > "$SETTINGS_FILE" <<EOF
+          # xvfb init may have rewritten our settings — put them back.
+          cat > ~/.config/godot/editor_settings-4.tres <<EOF
           [gd_resource type="EditorSettings" format=3]
 
           [resource]
@@ -125,24 +127,37 @@ jobs:
           export/android/debug_keystore_user = "androiddebugkey"
           export/android/debug_keystore_pass = "android"
           EOF
-          echo "--- re-asserted settings ---"
-          cat "$SETTINGS_FILE"
+          echo "--- re-asserted editor settings ---"
+          cat ~/.config/godot/editor_settings-4.tres
 
-      - name: Build Android APK (debug)
+      - name: Build Android APK (debug, via xvfb)
         run: |
           mkdir -p build/android
-          godot --headless --verbose --export-debug "Android" \
+          set +e
+          xvfb-run -a --server-args="-screen 0 1280x720x24" \
+            godot --verbose --export-debug "Android" \
             "${GITHUB_WORKSPACE}/build/android/${EXPORT_NAME}.apk" 2>&1 \
             | tee export.log
-          EXIT_CODE=${PIPESTATUS[0]}
-          echo "--- export exit code: $EXIT_CODE ---"
-          echo "--- any lines between 'configuration errors:' and the 'at:' line ---"
-          awk '/configuration errors:/{flag=1; next} /^   at:/{flag=0} flag' export.log || true
-          exit $EXIT_CODE
+          EXIT=${PIPESTATUS[0]}
+          echo "--- export exit code: $EXIT ---"
+          echo "--- error context (30 lines around any ERROR) ---"
+          grep -n -B2 -A10 "ERROR\|error:\|required" export.log | head -100 || true
+          exit $EXIT
 
       - name: Upload APK artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.EXPORT_NAME }}-apk
           path: build/android/${{ env.EXPORT_NAME }}.apk
           if-no-files-found: error
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            editor-init.log
+            export.log
+          if-no-files-found: ignore
