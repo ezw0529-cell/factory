@@ -826,7 +826,7 @@
     ctx.fillStyle = "#ffd84a";
     ctx.font = "bold 18px 'Apple SD Gothic Neo', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("성", sbX + 11, sbY + 28);
+    ctx.fillText("선", sbX + 11, sbY + 28);
     ctx.fillText("심", sbX + 11, sbY + 64);
     ctx.fillText("당", sbX + 11, sbY + 100);
 
@@ -883,6 +883,46 @@
     // sidewalk base
     ctx.fillStyle = "#3a2a1a";
     ctx.fillRect(x, y + h - 10, w, 10);
+
+    // queue of customers in front of the store
+    // place the line along the sidewalk, inline with the storefront.
+    // side flag: if the building hugs the left curb, queue extends rightward;
+    // if it hugs the right curb, queue extends leftward.
+    const onLeft = x < W / 2;
+    const queueY = y + h + 6;
+    const startX = onLeft ? x + w + 2 : x - 2;
+    const step = onLeft ? 14 : -14;
+    const palettes = [
+      { body: "#c64848", head: "#f2c29b", hat: "#2a2a30" },
+      { body: "#3c7a4a", head: "#e8b08a", hat: null },
+      { body: "#b88a2a", head: "#f2c29b", hat: "#4a2a10" },
+      { body: "#2a4a6a", head: "#c48a6a", hat: "#c63030" },
+      { body: "#6a3a6a", head: "#f0c0a0", hat: null },
+      { body: "#1a1a2a", head: "#e8b08a", hat: "#e8c547" },
+      { body: "#8a4a6a", head: "#f2c29b", hat: null },
+    ];
+    for (let i = 0; i < 7; i++) {
+      const px = startX + step * i;
+      const pal = palettes[i % palettes.length];
+      const bob = Math.sin((i + state.roadOffset * 0.02) * 1.7) * 1;
+      // body
+      ctx.fillStyle = pal.body;
+      roundRect(px - 5, queueY + 4 + bob, 10, 14, 3);
+      ctx.fill();
+      // head
+      ctx.fillStyle = pal.head;
+      ctx.beginPath();
+      ctx.arc(px, queueY + bob, 5, 0, Math.PI * 2);
+      ctx.fill();
+      // hat
+      if (pal.hat) {
+        ctx.fillStyle = pal.hat;
+        ctx.beginPath();
+        ctx.arc(px, queueY - 2 + bob, 5, Math.PI, 0);
+        ctx.fill();
+        ctx.fillRect(px - 6, queueY - 2 + bob, 12, 2);
+      }
+    }
   }
 
   function drawScenery(s) {
