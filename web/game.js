@@ -1678,29 +1678,37 @@
     ctx.beginPath();
     ctx.ellipse(cx, y + b.h * 0.5, 80, 40, 0, 0, Math.PI * 2);
     ctx.fill();
-    // signature swoop pompadour (oversized, volume swept to one side)
-    ctx.fillStyle = "#f6b84a";
+    // signature combover — single unified golden-blonde tone
+    const hairBase = "#e6b858";
+    ctx.fillStyle = hairBase;
+    // main volume: swept-back pompadour, higher on left, trailing right
     ctx.beginPath();
-    ctx.moveTo(cx - 94, y + b.h * 0.34);
-    ctx.quadraticCurveTo(cx - 90, y - 30, cx - 20, y - 8);
-    ctx.quadraticCurveTo(cx + 60, y - 20, cx + 110, y + 16);
-    ctx.quadraticCurveTo(cx + 120, y + b.h * 0.22, cx + 88, y + b.h * 0.3);
-    ctx.quadraticCurveTo(cx + 20, y + b.h * 0.18, cx - 94, y + b.h * 0.34);
+    ctx.moveTo(cx - 96, y + b.h * 0.36);
+    ctx.quadraticCurveTo(cx - 110, y - 10, cx - 40, y - 26);
+    ctx.quadraticCurveTo(cx + 40, y - 34, cx + 96, y - 6);
+    ctx.quadraticCurveTo(cx + 126, y + b.h * 0.14, cx + 110, y + b.h * 0.3);
+    ctx.quadraticCurveTo(cx + 80, y + b.h * 0.22, cx + 40, y + b.h * 0.24);
+    ctx.quadraticCurveTo(cx - 30, y + b.h * 0.22, cx - 96, y + b.h * 0.36);
     ctx.fill();
-    // darker undertones — strand highlights
-    ctx.fillStyle = "#c6882a";
+    // front wave flop — the iconic forehead sweep
     ctx.beginPath();
-    ctx.moveTo(cx - 50, y + b.h * 0.22);
-    ctx.quadraticCurveTo(cx + 20, y + b.h * 0.08, cx + 80, y + b.h * 0.2);
-    ctx.quadraticCurveTo(cx + 40, y + b.h * 0.24, cx - 50, y + b.h * 0.22);
+    ctx.moveTo(cx - 80, y + b.h * 0.32);
+    ctx.quadraticCurveTo(cx - 40, y + b.h * 0.12, cx + 20, y + b.h * 0.18);
+    ctx.quadraticCurveTo(cx + 70, y + b.h * 0.22, cx + 96, y + b.h * 0.34);
+    ctx.quadraticCurveTo(cx + 30, y + b.h * 0.3, cx - 80, y + b.h * 0.32);
     ctx.fill();
-    // light strand highlight on top
-    ctx.fillStyle = "#ffd88a";
-    ctx.beginPath();
-    ctx.moveTo(cx - 40, y + b.h * 0.08);
-    ctx.quadraticCurveTo(cx + 30, y - 4, cx + 70, y + b.h * 0.06);
-    ctx.quadraticCurveTo(cx + 30, y + b.h * 0.14, cx - 40, y + b.h * 0.08);
-    ctx.fill();
+    // subtle strand lines — thin darker strokes in same hue family
+    ctx.strokeStyle = "rgba(160, 110, 30, 0.35)";
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = "round";
+    for (let i = 0; i < 7; i++) {
+      const t = i / 6;
+      const sx = cx - 80 + t * 170;
+      ctx.beginPath();
+      ctx.moveTo(sx, y + b.h * 0.32);
+      ctx.quadraticCurveTo(sx + 20, y + b.h * 0.1 - t * 10, sx + 40 - t * 20, y - 10 + t * 8);
+      ctx.stroke();
+    }
     // squint eyes
     ctx.strokeStyle = "#111";
     ctx.lineWidth = 4;
