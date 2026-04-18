@@ -159,12 +159,12 @@ button:active {
   position: absolute;
   left: 0;
   right: 0;
-  top: 100%;
-  padding: 40px 24px 160px;
+  top: 18%;
+  padding: 0 24px 160px;
   text-align: center;
   word-break: keep-all;
   overflow-wrap: break-word;
-  animation: creditScroll 55s linear forwards;
+  animation: creditScroll 48s linear forwards;
 }
 
 #credits-overlay::after {
@@ -179,7 +179,7 @@ button:active {
 
 @keyframes creditScroll {
   0% { transform: translateY(0); }
-  100% { transform: translateY(calc(-100% - 100vh)); }
+  100% { transform: translateY(calc(-100% - 25vh)); }
 }
 
 .cr-title {

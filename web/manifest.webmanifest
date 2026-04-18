@@ -1,0 +1,19 @@
+{
+  "name": "늑구런",
+  "short_name": "늑구런",
+  "description": "대전 동물원을 탈출한 늑구의 10일간의 질주 — 픽션입니다.",
+  "lang": "ko",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#0d141f",
+  "theme_color": "#0d141f",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
