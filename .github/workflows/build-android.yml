@@ -82,7 +82,9 @@ jobs:
       - name: Write Godot editor settings
         run: |
           mkdir -p ~/.config/godot
-          cat > ~/.config/godot/editor_settings-4.tres <<EOF
+          # Godot 4.4 reads editor_settings-4.4.tres; 4.3 reads editor_settings-4.tres.
+          # Write both so we are version-agnostic.
+          SETTINGS_BODY=$(cat <<EOF
           [gd_resource type="EditorSettings" format=3]
 
           [resource]
@@ -92,8 +94,12 @@ jobs:
           export/android/debug_keystore_user = "androiddebugkey"
           export/android/debug_keystore_pass = "android"
           EOF
-          echo "::group::editor_settings-4.tres"
-          cat ~/.config/godot/editor_settings-4.tres
+          )
+          for f in editor_settings-4.tres editor_settings-4.3.tres editor_settings-4.4.tres; do
+            echo "$SETTINGS_BODY" > "$HOME/.config/godot/$f"
+          done
+          echo "::group::editor_settings-4.4.tres"
+          cat ~/.config/godot/editor_settings-4.4.tres
           echo "::endgroup::"
           echo "::group::env"
           echo "JAVA_HOME=$JAVA_HOME"
@@ -139,7 +145,7 @@ jobs:
 
       - name: Re-assert editor settings after import
         run: |
-          cat > ~/.config/godot/editor_settings-4.tres <<EOF
+          SETTINGS_BODY=$(cat <<EOF
           [gd_resource type="EditorSettings" format=3]
 
           [resource]
@@ -149,6 +155,10 @@ jobs:
           export/android/debug_keystore_user = "androiddebugkey"
           export/android/debug_keystore_pass = "android"
           EOF
+          )
+          for f in editor_settings-4.tres editor_settings-4.3.tres editor_settings-4.4.tres; do
+            echo "$SETTINGS_BODY" > "$HOME/.config/godot/$f"
+          done
 
       - name: Build Android APK (debug)
         run: |
