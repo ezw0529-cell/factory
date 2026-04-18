@@ -212,6 +212,16 @@ button:active {
   margin: 36px auto;
 }
 
+.cr-disclaimer {
+  font-size: clamp(13px, 3.2vw, 17px);
+  color: #889;
+  margin: 30px auto;
+  line-height: 1.6;
+  max-width: 520px;
+  font-style: italic;
+  opacity: 0.85;
+}
+
 #credits-restart-btn {
   position: absolute;
   bottom: max(30px, env(safe-area-inset-bottom));

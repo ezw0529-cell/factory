@@ -1,6 +1,6 @@
 # 늑구런 (Neukgu Run)
 
-대전 오월드를 탈출한 늑구의 10일간의 질주를 모티브로 한 모바일 엔드리스 러너.
+대전 5월드를 탈출한 늑구의 10일간의 질주를 모티브로 한 모바일 엔드리스 러너.
 
 ## 🎮 게임 개요
 
@@ -74,7 +74,7 @@ game asset sprite sheet, 4-frame running animation, 128x128 per frame
 
 ### 3. 배경
 
-- 대전 오월드 풍경, 도시 거리, 야산 등 여러 배경 루프
+- 대전 5월드 풍경, 도시 거리, 야산 등 여러 배경 루프
 - `scenes/main.tscn` 의 `Sky` `ColorRect` 를 배경 이미지로 교체
 
 ## 💰 수익화 로드맵 (TODO)
@@ -98,5 +98,5 @@ game asset sprite sheet, 4-frame running animation, 128x128 per frame
 
 ## 🐾 크레딧
 
-- 원작 늑구: 대전 오월드 (2026년 4월, 무사 생포 🎉)
+- 원작 늑구: 대전 5월드 (2026년 4월, 무사 생포 🎉)
 - 게임 제작: Made with Claude Code + Godot Engine
