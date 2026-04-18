@@ -7,14 +7,14 @@
   const PLAYER_Y = 980;
   const PLAYER_MARGIN = 30;
 
-  const SCROLL_START = 520;
-  const SCROLL_MAX = 1400;
-  const SCROLL_ACCEL = 14;
+  const SCROLL_START = 420;
+  const SCROLL_MAX = 950;
+  const SCROLL_ACCEL = 8;
 
   const OBS_W = 120;
   const OBS_H = 130;
-  const SPAWN_MIN = 0.55;
-  const SPAWN_MAX = 1.1;
+  const SPAWN_MIN = 0.85;
+  const SPAWN_MAX = 1.7;
 
   const STEER_SPEED = 1800;
 
@@ -33,7 +33,7 @@
   const creditsOverlay = document.getElementById("credits-overlay");
   const creditsScroll = document.getElementById("credits-scroll");
 
-  const BOSS_SCORE = 600;
+  const BOSS_SCORE = 220;
 
   const state = {
     running: false,
@@ -128,8 +128,8 @@
       overSubEl.textContent = "\uD83D\uDC94 뜻밖의 반전. 놀랍지만 실화.";
       overSubEl.classList.remove("hidden");
     } else if (reason === "trump") {
-      overTitleEl.textContent = "트럼프에게 잡혔다";
-      overSubEl.textContent = "호르무즈 해협은 지켜졌다.";
+      overTitleEl.textContent = "도람뿌에게 잡혔다";
+      overSubEl.textContent = "해협은 지켜졌다.";
       overSubEl.classList.remove("hidden");
     } else {
       overTitleEl.textContent = "잡혔다!";
@@ -216,11 +216,11 @@
       }
     }
 
-    // player hitbox (reused for obstacle + boss collision)
-    const px1 = p.x - PLAYER_W / 2 + 18;
-    const px2 = p.x + PLAYER_W / 2 - 18;
-    const py1 = PLAYER_Y - PLAYER_H / 2 + 14;
-    const py2 = PLAYER_Y + PLAYER_H / 2 - 8;
+    // player hitbox (reused for obstacle + boss collision — forgiving)
+    const px1 = p.x - PLAYER_W / 2 + 32;
+    const px2 = p.x + PLAYER_W / 2 - 32;
+    const py1 = PLAYER_Y - PLAYER_H / 2 + 28;
+    const py2 = PLAYER_Y + PLAYER_H / 2 - 18;
 
     // phase transition into boss
     if (state.phase === "normal" && state.score >= BOSS_SCORE) {
@@ -288,9 +288,9 @@
       }
     }
 
-    // obstacle collision
+    // obstacle collision (extra padding on obstacle sides too)
     for (const o of state.obstacles) {
-      if (px1 < o.x + o.w - 6 && px2 > o.x + 6 && py1 < o.y + o.h - 6 && py2 > o.y + 6) {
+      if (px1 < o.x + o.w - 14 && px2 > o.x + 14 && py1 < o.y + o.h - 14 && py2 > o.y + 14) {
         gameOver(o.type === 3 ? "male" : undefined);
         return;
       }
@@ -629,8 +629,8 @@
     ctx.beginPath();
     ctx.ellipse(cx, y + b.h * 0.5, 80, 40, 0, 0, Math.PI * 2);
     ctx.fill();
-    // hair (yellow swoop)
-    ctx.fillStyle = "#f7d85a";
+    // hair (parody orange swoop)
+    ctx.fillStyle = "#ff9b3d";
     ctx.beginPath();
     ctx.moveTo(cx - 90, y + b.h * 0.32);
     ctx.quadraticCurveTo(cx - 60, y + 10, cx + 40, y + 30);
@@ -657,7 +657,7 @@
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 18px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("HORMUZ", cx, y + b.h * 0.05 + 19);
+    ctx.fillText("도람뿌", cx, y + b.h * 0.05 + 19);
 
     // arms out (blocking)
     ctx.fillStyle = "#1b2a48";
@@ -681,7 +681,7 @@
     ctx.fillText("호르무즈 해협", W / 2, H * 0.48);
     ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
     ctx.font = "bold 34px sans-serif";
-    ctx.fillText("최종 관문 — 트럼프 등장!", W / 2, H * 0.53);
+    ctx.fillText("최종 관문 — 도람뿌 등장!", W / 2, H * 0.53);
   }
 
   function render() {
