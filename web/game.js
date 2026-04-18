@@ -288,7 +288,7 @@
       spawnSungsimdang();
     }
     // mid landmark: baseball stadium
-    if (!state.stadiumSpawned && state.phase === "normal" && state.distance > 6200) {
+    if (!state.stadiumSpawned && state.phase === "normal" && state.distance > 4200) {
       state.stadiumSpawned = true;
       spawnStadium();
     }
@@ -997,17 +997,23 @@
     const cy = s.y + s.h / 2;
     const rx = s.w / 2;
     const ry = s.h / 2;
-    // outer concrete ring
-    ctx.fillStyle = "#8a8578";
+    // outer concrete ring (warm tan)
+    ctx.fillStyle = "#a88a6a";
     ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
-    // seating bowl (darker ring)
-    ctx.fillStyle = "#3a3f4a";
+    // seating bowl (orange-forward team colorway)
+    ctx.fillStyle = "#e06a1a";
     ctx.beginPath(); ctx.ellipse(cx, cy, rx - 10, ry - 10, 0, 0, Math.PI * 2); ctx.fill();
-    // seating rows — concentric ellipses
-    ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.lineWidth = 1;
-    for (let i = 0; i < 4; i++) {
+    // alternating dark-orange tier band
+    ctx.fillStyle = "#b04a10";
+    ctx.beginPath(); ctx.ellipse(cx, cy, rx - 18, ry - 18, 0, 0, Math.PI * 2); ctx.fill();
+    // bright orange top tier (closest to the field)
+    ctx.fillStyle = "#ff8a30";
+    ctx.beginPath(); ctx.ellipse(cx, cy, rx - 28, ry - 28, 0, 0, Math.PI * 2); ctx.fill();
+    // thin seat-row scribes
+    ctx.strokeStyle = "rgba(255,255,255,0.25)"; ctx.lineWidth = 1;
+    for (let i = 0; i < 5; i++) {
       ctx.beginPath();
-      ctx.ellipse(cx, cy, rx - 14 - i * 5, ry - 14 - i * 5, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx, cy, rx - 14 - i * 4, ry - 14 - i * 4, 0, 0, Math.PI * 2);
       ctx.stroke();
     }
     // outfield grass (inner green)
