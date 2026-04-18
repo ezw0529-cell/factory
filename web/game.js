@@ -59,6 +59,8 @@
     bossAnnounce: 0,
     bullets: [],
     sungsimdangSpawned: false,
+    stadiumSpawned: false,
+    reveal: null, // { x, y, t } when "암컷 → 수컷" flip is playing
   };
 
   bestEl.textContent = "최고 " + state.best;
@@ -85,9 +87,9 @@
     const side = Math.random() < 0.5 ? "L" : "R";
     const roll = Math.random();
     let kind, w, h;
-    if (roll < 0.45) {
+    if (roll < 0.18) {
       kind = "sign"; w = 90; h = 100;
-    } else if (roll < 0.85) {
+    } else if (roll < 0.8) {
       kind = "building"; w = 110; h = 100 + Math.random() * 60;
     } else {
       kind = "tree"; w = 60; h = 60;
@@ -105,6 +107,15 @@
     const h = 340;
     const x = side === "L" ? -2 : W - w + 2;  // hug the sidewalk edge
     state.scenery.push({ kind: "sungsimdang_big", x, y: -h - 40, w, h, label: null });
+  }
+
+  function spawnStadium() {
+    // big stadium landmark — extends past the sidewalk
+    const side = Math.random() < 0.5 ? "L" : "R";
+    const w = 210;
+    const h = 340;
+    const x = side === "L" ? -70 : W - w + 70;  // partially off-screen
+    state.scenery.push({ kind: "stadium_big", x, y: -h - 40, w, h, side });
   }
 
   function seedScenery() {
@@ -131,6 +142,8 @@
     state.bossAnnounce = 0;
     state.bullets = [];
     state.sungsimdangSpawned = false;
+    state.stadiumSpawned = false;
+    state.reveal = null;
     scoreEl.textContent = "점수 0";
   }
 
@@ -215,6 +228,17 @@
   function update(dt) {
     if (!state.running) return;
 
+    // 암컷→수컷 reveal pauses the world until game-over kicks in
+    if (state.reveal) {
+      state.reveal.t += dt;
+      state.shake = Math.min(20, state.shake + 30 * dt);
+      if (state.reveal.t >= 0.9) {
+        state.reveal = null;
+        gameOver("male");
+      }
+      return;
+    }
+
     state.scroll = Math.min(SCROLL_MAX, state.scroll + SCROLL_ACCEL * dt);
     state.distance += state.scroll * dt;
     const newScore = Math.floor(state.distance / 25);
@@ -258,10 +282,15 @@
     const py1 = PLAYER_Y - PLAYER_H / 2 + 28;
     const py2 = PLAYER_Y + PLAYER_H / 2 - 18;
 
-    // early landmark: big 성심당 once, a few seconds in
+    // early landmark: big 선심당 once, a few seconds in
     if (!state.sungsimdangSpawned && state.phase === "normal" && state.distance > 2600) {
       state.sungsimdangSpawned = true;
       spawnSungsimdang();
+    }
+    // mid landmark: baseball stadium
+    if (!state.stadiumSpawned && state.phase === "normal" && state.distance > 6200) {
+      state.stadiumSpawned = true;
+      spawnStadium();
     }
 
     // phase transition into boss
@@ -308,13 +337,8 @@
         const maxI = Math.max(0.45, SPAWN_MAX - ratio * 0.5);
         state.spawnTimer = minI + Math.random() * (maxI - minI);
       }
-    } else if (state.phase === "approach" || state.phase === "boss") {
-      state.spawnTimer -= dt;
-      if (state.spawnTimer <= 0) {
-        spawnTanker();
-        state.spawnTimer = 1.4 + Math.random() * 1.0;
-      }
     }
+    // during approach/boss, no obstacles spawn — tankers are background only
 
     // move obstacles
     for (const o of state.obstacles) o.y += state.scroll * dt;
@@ -393,7 +417,11 @@
     // obstacle collision (extra padding on obstacle sides too)
     for (const o of state.obstacles) {
       if (px1 < o.x + o.w - 14 && px2 > o.x + 14 && py1 < o.y + o.h - 14 && py2 > o.y + 14) {
-        gameOver(o.type === 3 ? "male" : undefined);
+        if (o.type === 3) {
+          state.reveal = { x: o.x + o.w / 2, y: o.y + o.h / 2, t: 0 };
+        } else {
+          gameOver();
+        }
         return;
       }
     }
@@ -465,14 +493,8 @@
         ctx.stroke();
       }
 
-      // distant oil tanker
-      const tankerX = (state.phaseT * 40) % (W + 400) - 200;
-      ctx.fillStyle = "#222";
-      roundRect(tankerX, H * 0.58, 180, 30, 6); ctx.fill();
-      ctx.fillStyle = "#e84a2a";
-      ctx.fillRect(tankerX + 140, H * 0.58 - 36, 14, 36);
-      ctx.fillStyle = "#888";
-      ctx.fillRect(tankerX + 80, H * 0.58 - 18, 40, 18);
+      // fleet of tankers crowded across the strait (horizontal silhouettes)
+      drawStraitFleet();
 
       // dramatic cliffs — left
       ctx.fillStyle = "#5a3a24";
@@ -580,14 +602,17 @@
       for (const s of state.scenery) drawScenery(s);
     }
 
-    // soft clouds
-    ctx.fillStyle = isBossBg ? "rgba(255, 200, 150, 0.3)" : "rgba(255, 255, 255, 0.18)";
-    for (const c of state.clouds) {
-      ctx.beginPath();
-      ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
-      ctx.arc(c.x + c.r * 0.7, c.y + 8, c.r * 0.7, 0, Math.PI * 2);
-      ctx.arc(c.x - c.r * 0.6, c.y + 6, c.r * 0.6, 0, Math.PI * 2);
-      ctx.fill();
+    // soft clouds — only in strait/boss scene, not over the city road
+    if (isBossBg) {
+      ctx.fillStyle = "rgba(255, 200, 150, 0.3)";
+      for (const c of state.clouds) {
+        if (c.y > H * 0.5) continue;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+        ctx.arc(c.x + c.r * 0.7, c.y + 8, c.r * 0.7, 0, Math.PI * 2);
+        ctx.arc(c.x - c.r * 0.6, c.y + 6, c.r * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
 
@@ -884,50 +909,205 @@
     ctx.fillStyle = "#3a2a1a";
     ctx.fillRect(x, y + h - 10, w, 10);
 
-    // queue of customers in front of the store
-    // place the line along the sidewalk, inline with the storefront.
-    // side flag: if the building hugs the left curb, queue extends rightward;
-    // if it hugs the right curb, queue extends leftward.
-    const onLeft = x < W / 2;
-    const queueY = y + h + 6;
-    const startX = onLeft ? x + w + 2 : x - 2;
-    const step = onLeft ? 14 : -14;
+    // queue of customers in a vertical line below the storefront
+    drawQueue(x + w / 2, y + h + 30);
+  }
+
+  function drawQueue(cx, startY) {
     const palettes = [
       { body: "#c64848", head: "#f2c29b", hat: "#2a2a30" },
       { body: "#3c7a4a", head: "#e8b08a", hat: null },
       { body: "#b88a2a", head: "#f2c29b", hat: "#4a2a10" },
       { body: "#2a4a6a", head: "#c48a6a", hat: "#c63030" },
       { body: "#6a3a6a", head: "#f0c0a0", hat: null },
-      { body: "#1a1a2a", head: "#e8b08a", hat: "#e8c547" },
-      { body: "#8a4a6a", head: "#f2c29b", hat: null },
     ];
-    for (let i = 0; i < 7; i++) {
-      const px = startX + step * i;
-      const pal = palettes[i % palettes.length];
-      const bob = Math.sin((i + state.roadOffset * 0.02) * 1.7) * 1;
-      // body
-      ctx.fillStyle = pal.body;
-      roundRect(px - 5, queueY + 4 + bob, 10, 14, 3);
-      ctx.fill();
-      // head
-      ctx.fillStyle = pal.head;
+    const pw = 60;  // per-figure width
+    const ph = 90;  // per-figure height
+    const gap = 16;
+    for (let i = 0; i < palettes.length; i++) {
+      const py = startY + i * (ph + gap);
+      drawCustomer(cx, py, pw, ph, palettes[i], i);
+    }
+  }
+
+  function drawCustomer(cx, py, w, h, pal, idx) {
+    const bob = Math.sin((idx * 0.9) + state.roadOffset * 0.01) * 1.5;
+    const x = cx - w / 2;
+    const y = py + bob;
+    // shadow
+    ctx.fillStyle = "rgba(0,0,0,0.22)";
+    ctx.beginPath();
+    ctx.ellipse(cx, y + h - 2, w * 0.38, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // legs
+    ctx.fillStyle = "#222";
+    roundRect(cx - 10, y + h * 0.72, 8, h * 0.28, 3); ctx.fill();
+    roundRect(cx + 2, y + h * 0.72, 8, h * 0.28, 3); ctx.fill();
+    // body (t-shirt)
+    ctx.fillStyle = pal.body;
+    roundRect(cx - w * 0.36, y + h * 0.32, w * 0.72, h * 0.44, 8); ctx.fill();
+    // arms
+    ctx.fillStyle = pal.body;
+    roundRect(cx - w * 0.5, y + h * 0.34, w * 0.18, h * 0.34, 6); ctx.fill();
+    roundRect(cx + w * 0.32, y + h * 0.34, w * 0.18, h * 0.34, 6); ctx.fill();
+    // hands
+    ctx.fillStyle = pal.head;
+    ctx.beginPath();
+    ctx.arc(cx - w * 0.41, y + h * 0.7, 5, 0, Math.PI * 2);
+    ctx.arc(cx + w * 0.41, y + h * 0.7, 5, 0, Math.PI * 2);
+    ctx.fill();
+    // shopping bag (selected ones)
+    if (idx % 2 === 0) {
+      ctx.fillStyle = "#f4d96a";
+      roundRect(cx + w * 0.38, y + h * 0.66, 12, 14, 2); ctx.fill();
+      ctx.strokeStyle = "#c69a20"; ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(px, queueY + bob, 5, 0, Math.PI * 2);
+      ctx.moveTo(cx + w * 0.4, y + h * 0.66);
+      ctx.quadraticCurveTo(cx + w * 0.44, y + h * 0.6, cx + w * 0.48, y + h * 0.66);
+      ctx.stroke();
+    }
+    // head
+    ctx.fillStyle = pal.head;
+    ctx.beginPath();
+    ctx.arc(cx, y + h * 0.18, 13, 0, Math.PI * 2);
+    ctx.fill();
+    // hair or hat
+    if (pal.hat) {
+      ctx.fillStyle = pal.hat;
+      ctx.beginPath();
+      ctx.arc(cx, y + h * 0.12, 13, Math.PI, 0);
       ctx.fill();
-      // hat
-      if (pal.hat) {
-        ctx.fillStyle = pal.hat;
-        ctx.beginPath();
-        ctx.arc(px, queueY - 2 + bob, 5, Math.PI, 0);
-        ctx.fill();
-        ctx.fillRect(px - 6, queueY - 2 + bob, 12, 2);
+      ctx.fillRect(cx - 15, y + h * 0.12, 30, 3);
+    } else {
+      ctx.fillStyle = "#1a1a1a";
+      ctx.beginPath();
+      ctx.arc(cx, y + h * 0.12, 13, Math.PI, 0);
+      ctx.fill();
+    }
+    // eyes
+    ctx.fillStyle = "#1a1a1a";
+    ctx.beginPath();
+    ctx.arc(cx - 4, y + h * 0.2, 1.5, 0, Math.PI * 2);
+    ctx.arc(cx + 4, y + h * 0.2, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawStadiumBig(s) {
+    const cx = s.x + s.w / 2;
+    const cy = s.y + s.h / 2;
+    const rx = s.w / 2;
+    const ry = s.h / 2;
+    // outer concrete ring
+    ctx.fillStyle = "#8a8578";
+    ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+    // seating bowl (darker ring)
+    ctx.fillStyle = "#3a3f4a";
+    ctx.beginPath(); ctx.ellipse(cx, cy, rx - 10, ry - 10, 0, 0, Math.PI * 2); ctx.fill();
+    // seating rows — concentric ellipses
+    ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.lineWidth = 1;
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx - 14 - i * 5, ry - 14 - i * 5, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    // outfield grass (inner green)
+    ctx.fillStyle = "#3d7a3d";
+    ctx.beginPath(); ctx.ellipse(cx, cy, rx - 38, ry - 38, 0, 0, Math.PI * 2); ctx.fill();
+    // mowing stripes
+    ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.lineWidth = 6;
+    for (let i = -3; i <= 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(cx + i * 14, cy - ry + 40);
+      ctx.lineTo(cx + i * 14, cy + ry - 40);
+      ctx.stroke();
+    }
+    // warning track (orange ring at edge of grass)
+    ctx.strokeStyle = "#c88a4a"; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.ellipse(cx, cy, rx - 38, ry - 38, 0, 0, Math.PI * 2); ctx.stroke();
+    // infield diamond (clay)
+    ctx.fillStyle = "#c27a3a";
+    ctx.save();
+    ctx.translate(cx, cy + ry * 0.2);
+    ctx.rotate(Math.PI / 4);
+    const sq = Math.min(rx, ry) * 0.55;
+    ctx.fillRect(-sq / 2, -sq / 2, sq, sq);
+    ctx.restore();
+    // bases
+    ctx.fillStyle = "#ffffff";
+    const baseR = 4;
+    const bases = [
+      { dx: 0, dy: ry * 0.2 + 38 },    // home
+      { dx: 34, dy: ry * 0.2 + 4 },    // first
+      { dx: 0, dy: ry * 0.2 - 30 },    // second
+      { dx: -34, dy: ry * 0.2 + 4 },   // third
+    ];
+    for (const b of bases) {
+      ctx.beginPath();
+      ctx.arc(cx + b.dx, cy + b.dy, baseR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // pitcher's mound
+    ctx.fillStyle = "#d68a4a";
+    ctx.beginPath();
+    ctx.arc(cx, cy + ry * 0.2 + 4, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(cx - 2, cy + ry * 0.2 + 2, 4, 4);
+
+    // scoreboard on the near edge of the ring
+    const sbSide = s.side === "L" ? 1 : -1; // face toward the road side
+    const sbx = cx + sbSide * (rx - 30);
+    const sby = cy - ry * 0.55;
+    ctx.fillStyle = "#1a1a1a";
+    roundRect(sbx - 22, sby - 16, 44, 32, 3); ctx.fill();
+    ctx.fillStyle = "#ff7a2a";
+    ctx.font = "bold 10px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("SCORE", sbx, sby - 4);
+    ctx.fillStyle = "#ffd84a";
+    ctx.font = "bold 12px 'Apple SD Gothic Neo', sans-serif";
+    ctx.fillText("1 : 0", sbx, sby + 10);
+
+    // stadium light tower (tall post with light cluster)
+    const ltx = cx + sbSide * (rx - 14);
+    const lty = cy + ry * 0.4;
+    ctx.fillStyle = "#2a2a2a";
+    ctx.fillRect(ltx - 1, lty - 30, 2, 30);
+    ctx.fillStyle = "#f5e88a";
+    roundRect(ltx - 8, lty - 42, 16, 12, 2); ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    for (let ix = 0; ix < 3; ix++) {
+      for (let iy = 0; iy < 2; iy++) {
+        ctx.fillRect(ltx - 7 + ix * 5, lty - 40 + iy * 5, 3, 3);
       }
+    }
+
+    // team banner on the bowl edge
+    const bnx = cx - 50;
+    const bny = cy + ry - 22;
+    ctx.fillStyle = "#ff7a2a";
+    roundRect(bnx, bny, 100, 16, 3); ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 10px 'Apple SD Gothic Neo', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("하나 이겼으 파크", bnx + 50, bny + 12);
+
+    // tiny spectators as dots around the rim
+    ctx.fillStyle = "#ff7a2a";
+    for (let a = 0; a < Math.PI * 2; a += 0.35) {
+      const r = rx - 20;
+      const ry2 = ry - 20;
+      ctx.beginPath();
+      ctx.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * ry2, 1.5, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 
   function drawScenery(s) {
     if (s.kind === "sungsimdang_big") {
       drawSungsimdangBig(s);
+    } else if (s.kind === "stadium_big") {
+      drawStadiumBig(s);
     } else if (s.kind === "sign") {
       // green street sign on pole
       ctx.fillStyle = "#4a4a4a";
@@ -1162,9 +1342,108 @@
       ctx.beginPath(); ctx.ellipse(cx, cy - 10, 12, 9, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#111";
       ctx.beginPath(); ctx.ellipse(cx, cy - 14, 5, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+      // ♀ symbol floating above head
+      const sy = cy - 78 + Math.sin(performance.now() / 300 + o.phase) * 4;
+      ctx.fillStyle = "#ff3f80";
+      ctx.beginPath();
+      ctx.arc(cx, sy, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(cx, sy, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#ff3f80"; ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(cx, sy, 7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx, sy + 7); ctx.lineTo(cx, sy + 18);
+      ctx.moveTo(cx - 5, sy + 13); ctx.lineTo(cx + 5, sy + 13);
+      ctx.stroke();
     } else if (o.type === 4) {
       drawTanker(o);
     }
+  }
+
+  function drawStraitFleet() {
+    // five horizontal tankers arranged across the water, with parallax drift
+    const rows = [
+      { y: H * 0.60, scale: 1.00, speed: 22 },
+      { y: H * 0.68, scale: 0.86, speed: 14 },
+      { y: H * 0.76, scale: 0.70, speed: 8 },
+    ];
+    const fleet = [
+      { row: 0, color: "#141820", tank: "#e07a2a", offset: 0,   flip: false },
+      { row: 0, color: "#1a1a22", tank: "#f2962e", offset: 300, flip: true },
+      { row: 1, color: "#1a1a22", tank: "#d66a2a", offset: 140, flip: false },
+      { row: 1, color: "#141820", tank: "#e07a2a", offset: 500, flip: true },
+      { row: 2, color: "#232830", tank: "#d4842a", offset: 60,  flip: false },
+      { row: 2, color: "#1a1a22", tank: "#c67020", offset: 380, flip: true },
+    ];
+    for (const s of fleet) {
+      const r = rows[s.row];
+      const len = 160 * r.scale;
+      const ht = 34 * r.scale;
+      const travel = (W + len + 200);
+      const raw = (state.phaseT * r.speed + s.offset) % travel;
+      const x = raw - len - 100;
+      drawTankerSide(x, r.y, len, ht, s.flip, s.color, s.tank);
+    }
+  }
+
+  function drawTankerSide(x, y, w, h, flip, hullColor, tankColor) {
+    ctx.save();
+    if (flip) {
+      ctx.translate(x + w, y);
+      ctx.scale(-1, 1);
+      ctx.translate(-x, -y);
+    }
+    // wake behind
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.beginPath();
+    ctx.moveTo(x + w + 6, y + h * 0.5);
+    ctx.lineTo(x + w + 34, y + h * 0.2);
+    ctx.lineTo(x + w + 34, y + h * 0.8);
+    ctx.closePath();
+    ctx.fill();
+    // hull (side view: flat deck on top, angled stern right, pointed bow left)
+    ctx.fillStyle = hullColor;
+    ctx.beginPath();
+    ctx.moveTo(x, y + h * 0.55);       // bow tip
+    ctx.lineTo(x + w * 0.1, y);         // up to deck
+    ctx.lineTo(x + w, y);               // deck back
+    ctx.lineTo(x + w, y + h);           // stern bottom
+    ctx.lineTo(x + w * 0.08, y + h);    // hull bottom to bow
+    ctx.closePath();
+    ctx.fill();
+    // hull waterline stripe
+    ctx.fillStyle = "#c63030";
+    ctx.fillRect(x + w * 0.08, y + h * 0.78, w * 0.9, Math.max(2, h * 0.08));
+    // deck tanks (horizontal cylinders)
+    ctx.fillStyle = tankColor;
+    const tanks = 4;
+    const tW = (w * 0.65) / tanks;
+    for (let i = 0; i < tanks; i++) {
+      const tx = x + w * 0.15 + i * tW;
+      roundRect(tx, y - h * 0.3, tW - 4, h * 0.4, h * 0.15);
+      ctx.fill();
+    }
+    // pipework
+    ctx.strokeStyle = "#555"; ctx.lineWidth = Math.max(1, h * 0.08);
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.15, y - h * 0.1);
+    ctx.lineTo(x + w * 0.82, y - h * 0.1);
+    ctx.stroke();
+    // bridge + stack at stern
+    ctx.fillStyle = "#e8e0c8";
+    ctx.fillRect(x + w * 0.82, y - h * 0.7, w * 0.16, h * 0.7);
+    ctx.fillStyle = "#6aa3c6";
+    ctx.fillRect(x + w * 0.84, y - h * 0.55, w * 0.12, h * 0.2);
+    ctx.fillStyle = "#c62020";
+    ctx.fillRect(x + w * 0.88, y - h * 1.0, w * 0.07, h * 0.35);
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(x + w * 0.87, y - h * 1.05, w * 0.09, h * 0.06);
+    ctx.restore();
   }
 
   function drawTanker(o) {
@@ -1294,13 +1573,28 @@
     ctx.beginPath();
     ctx.ellipse(cx, y + b.h * 0.5, 80, 40, 0, 0, Math.PI * 2);
     ctx.fill();
-    // hair (parody orange swoop)
-    ctx.fillStyle = "#ff9b3d";
+    // signature swoop pompadour (oversized, volume swept to one side)
+    ctx.fillStyle = "#f6b84a";
     ctx.beginPath();
-    ctx.moveTo(cx - 90, y + b.h * 0.32);
-    ctx.quadraticCurveTo(cx - 60, y + 10, cx + 40, y + 30);
-    ctx.quadraticCurveTo(cx + 110, y + 40, cx + 90, y + b.h * 0.3);
-    ctx.quadraticCurveTo(cx + 40, y + b.h * 0.22, cx - 90, y + b.h * 0.32);
+    ctx.moveTo(cx - 94, y + b.h * 0.34);
+    ctx.quadraticCurveTo(cx - 90, y - 30, cx - 20, y - 8);
+    ctx.quadraticCurveTo(cx + 60, y - 20, cx + 110, y + 16);
+    ctx.quadraticCurveTo(cx + 120, y + b.h * 0.22, cx + 88, y + b.h * 0.3);
+    ctx.quadraticCurveTo(cx + 20, y + b.h * 0.18, cx - 94, y + b.h * 0.34);
+    ctx.fill();
+    // darker undertones — strand highlights
+    ctx.fillStyle = "#c6882a";
+    ctx.beginPath();
+    ctx.moveTo(cx - 50, y + b.h * 0.22);
+    ctx.quadraticCurveTo(cx + 20, y + b.h * 0.08, cx + 80, y + b.h * 0.2);
+    ctx.quadraticCurveTo(cx + 40, y + b.h * 0.24, cx - 50, y + b.h * 0.22);
+    ctx.fill();
+    // light strand highlight on top
+    ctx.fillStyle = "#ffd88a";
+    ctx.beginPath();
+    ctx.moveTo(cx - 40, y + b.h * 0.08);
+    ctx.quadraticCurveTo(cx + 30, y - 4, cx + 70, y + b.h * 0.06);
+    ctx.quadraticCurveTo(cx + 30, y + b.h * 0.14, cx - 40, y + b.h * 0.08);
     ctx.fill();
     // squint eyes
     ctx.strokeStyle = "#111";
@@ -1315,14 +1609,6 @@
     ctx.fillStyle = "#3a1f1f";
     roundRect(cx - 18, y + b.h * 0.48, 36, 10, 4);
     ctx.fill();
-    // red cap (no text)
-    ctx.fillStyle = "#d62a2a";
-    roundRect(cx - 70, y + b.h * 0.05, 130, 26, 8);
-    ctx.fill();
-    // cap brim
-    ctx.fillStyle = "#8a1a1a";
-    ctx.fillRect(cx - 70, y + b.h * 0.05 + 24, 130, 5);
-
     // arms out (blocking)
     ctx.fillStyle = "#1b2a48";
     roundRect(cx - b.w / 2 - 10, y + b.h * 0.55, 70, 40, 14);
@@ -1383,7 +1669,88 @@
     if (state.phase === "boss" || state.phase === "victory") drawBoss();
     for (const bt of state.bullets) drawBullet(bt);
     drawBossAnnounce();
+    if (state.reveal) drawReveal();
     ctx.restore();
+  }
+
+  function drawReveal() {
+    const r = state.reveal;
+    const t = r.t;
+    // darken background
+    ctx.fillStyle = `rgba(0,0,0,${Math.min(0.55, t * 1.5)})`;
+    ctx.fillRect(0, 0, W, H);
+    // phase A (0..0.35): big ♀ bouncing
+    // phase B (0.35..0.55): quick shrink + flash
+    // phase C (0.55..0.9): ♂ growing with 충격 lines
+    if (t < 0.35) {
+      const scale = 1 + Math.sin(t * 18) * 0.08;
+      const sz = 88 * scale;
+      drawFemaleGlyph(r.x, r.y - 40, sz, "#ff3f80");
+    } else if (t < 0.55) {
+      // white flash
+      ctx.fillStyle = `rgba(255,255,255,${1 - (t - 0.35) * 4})`;
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      const grow = Math.min(1, (t - 0.55) * 4);
+      const sz = 60 + grow * 80;
+      // shock lines
+      ctx.strokeStyle = `rgba(255,220,80,${grow})`;
+      ctx.lineWidth = 4;
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        const r1 = sz + 20;
+        const r2 = sz + 60 + Math.sin(t * 20 + i) * 6;
+        ctx.beginPath();
+        ctx.moveTo(r.x + Math.cos(a) * r1, r.y - 40 + Math.sin(a) * r1);
+        ctx.lineTo(r.x + Math.cos(a) * r2, r.y - 40 + Math.sin(a) * r2);
+        ctx.stroke();
+      }
+      drawMaleGlyph(r.x, r.y - 40, sz, "#1e88e5");
+      // '수컷!' shout
+      ctx.fillStyle = "#ffd84a";
+      ctx.font = `bold ${Math.floor(40 + grow * 30)}px 'Apple SD Gothic Neo', sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText("수컷!", r.x, r.y + 80);
+    }
+  }
+
+  function drawFemaleGlyph(cx, cy, size, color) {
+    const rIn = size * 0.38;
+    ctx.lineWidth = Math.max(6, size * 0.1);
+    // circle
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx, cy - rIn * 0.4, rIn, 0, Math.PI * 2);
+    ctx.stroke();
+    // cross below
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + rIn * 0.6); ctx.lineTo(cx, cy + rIn * 1.6);
+    ctx.moveTo(cx - rIn * 0.5, cy + rIn * 1.15); ctx.lineTo(cx + rIn * 0.5, cy + rIn * 1.15);
+    ctx.stroke();
+  }
+
+  function drawMaleGlyph(cx, cy, size, color) {
+    const rIn = size * 0.38;
+    ctx.lineWidth = Math.max(6, size * 0.1);
+    ctx.strokeStyle = color;
+    // circle offset lower-left
+    ctx.beginPath();
+    ctx.arc(cx - rIn * 0.25, cy + rIn * 0.25, rIn, 0, Math.PI * 2);
+    ctx.stroke();
+    // arrow up-right
+    const ax1 = cx + rIn * 0.35, ay1 = cy - rIn * 0.35;
+    const ax2 = cx + rIn * 1.15, ay2 = cy - rIn * 1.15;
+    ctx.beginPath();
+    ctx.moveTo(ax1, ay1);
+    ctx.lineTo(ax2, ay2);
+    ctx.stroke();
+    // arrow head
+    ctx.beginPath();
+    ctx.moveTo(ax2, ay2);
+    ctx.lineTo(ax2 - rIn * 0.4, ay2 + rIn * 0.08);
+    ctx.moveTo(ax2, ay2);
+    ctx.lineTo(ax2 - rIn * 0.08, ay2 + rIn * 0.4);
+    ctx.stroke();
   }
 
   function loop(t) {
