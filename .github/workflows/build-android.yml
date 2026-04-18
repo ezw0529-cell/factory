@@ -10,64 +10,64 @@ on:
 
 env:
   GODOT_VERSION: 4.3
+  GODOT_STATUS: stable
   EXPORT_NAME: neukgu-run
 
 jobs:
   export-android:
     name: Build Android APK
     runs-on: ubuntu-22.04
-    container:
-      image: barichello/godot-ci:4.3
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Prepare export templates
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 11076708
+
+      - name: Install matching Android build-tools and platform
         run: |
-          mkdir -v -p ~/.local/share/godot/export_templates
-          mv /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable ~/.local/share/godot/export_templates/ || true
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+
+      - name: Download Godot
+        run: |
+          GODOT_ZIP="Godot_v${GODOT_VERSION}-${GODOT_STATUS}_linux.x86_64.zip"
+          wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-${GODOT_STATUS}/${GODOT_ZIP}"
+          unzip -q "${GODOT_ZIP}"
+          sudo mv "Godot_v${GODOT_VERSION}-${GODOT_STATUS}_linux.x86_64" /usr/local/bin/godot
+          sudo chmod +x /usr/local/bin/godot
+          godot --version
+
+      - name: Download Godot export templates
+        run: |
+          TPZ="Godot_v${GODOT_VERSION}-${GODOT_STATUS}_export_templates.tpz"
+          wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-${GODOT_STATUS}/${TPZ}"
+          TEMPLATE_DIR="${HOME}/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}"
+          mkdir -p "${TEMPLATE_DIR}"
+          unzip -q "${TPZ}"
+          mv templates/* "${TEMPLATE_DIR}/"
+          rmdir templates
+          ls -la "${TEMPLATE_DIR}/" | head -20
 
       - name: Generate debug keystore
+        id: keystore
         run: |
+          KEYSTORE_PATH="${GITHUB_WORKSPACE}/debug.keystore"
           keytool -keyalg RSA -genkeypair -alias androiddebugkey \
-            -keypass android -keystore debug.keystore \
+            -keypass android -keystore "${KEYSTORE_PATH}" \
             -storepass android \
             -dname "CN=Android Debug,O=Android,C=US" \
             -validity 9999 -deststoretype pkcs12
-
-      - name: Resolve JDK and Android SDK paths
-        id: sdk
-        run: |
-          # Find a usable Java SDK. JAVA_HOME may be unset in the container.
-          JDK_PATH="${JAVA_HOME:-}"
-          if [ -z "$JDK_PATH" ] || [ ! -x "$JDK_PATH/bin/javac" ]; then
-            for candidate in \
-              /usr/lib/jvm/java-17-openjdk-amd64 \
-              /usr/lib/jvm/java-11-openjdk-amd64 \
-              /usr/lib/jvm/default-java \
-              /opt/java/openjdk; do
-              if [ -x "$candidate/bin/javac" ]; then
-                JDK_PATH="$candidate"
-                break
-              fi
-            done
-          fi
-          if [ -z "$JDK_PATH" ] || [ ! -x "$JDK_PATH/bin/javac" ]; then
-            # Fallback: derive from `which javac`
-            JAVAC_BIN="$(command -v javac || true)"
-            if [ -n "$JAVAC_BIN" ]; then
-              JDK_PATH="$(dirname "$(dirname "$(readlink -f "$JAVAC_BIN")")")"
-            fi
-          fi
-          if [ -z "$JDK_PATH" ] || [ ! -x "$JDK_PATH/bin/javac" ]; then
-            echo "::error::No JDK with javac found in container"
-            exit 1
-          fi
-          SDK_PATH="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/lib/android-sdk}}"
-          echo "jdk=$JDK_PATH" >> "$GITHUB_OUTPUT"
-          echo "sdk=$SDK_PATH" >> "$GITHUB_OUTPUT"
-          echo "Resolved JDK: $JDK_PATH"
-          echo "Resolved Android SDK: $SDK_PATH"
+          ls -la "${KEYSTORE_PATH}"
+          echo "path=${KEYSTORE_PATH}" >> "$GITHUB_OUTPUT"
 
       - name: Configure Godot editor settings
         run: |
@@ -76,24 +76,32 @@ jobs:
           [gd_resource type="EditorSettings" format=3]
 
           [resource]
-          export/android/java_sdk_path = "${{ steps.sdk.outputs.jdk }}"
-          export/android/android_sdk_path = "${{ steps.sdk.outputs.sdk }}"
-          export/android/debug_keystore = "$(pwd)/debug.keystore"
+          export/android/java_sdk_path = "${JAVA_HOME}"
+          export/android/android_sdk_path = "${ANDROID_HOME}"
+          export/android/debug_keystore = "${{ steps.keystore.outputs.path }}"
           export/android/debug_keystore_user = "androiddebugkey"
           export/android/debug_keystore_pass = "android"
           EOF
           echo "--- editor_settings-4.tres ---"
           cat ~/.config/godot/editor_settings-4.tres
+          echo "--- environment ---"
+          echo "JAVA_HOME=$JAVA_HOME"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          java -version
+          echo "--- android build-tools ---"
+          ls -la "$ANDROID_HOME/build-tools/" 2>&1 || true
+          echo "--- android platforms ---"
+          ls -la "$ANDROID_HOME/platforms/" 2>&1 || true
 
       - name: Import project (priming)
-        continue-on-error: true
         run: |
-          godot --headless --import || true
+          godot --headless --import 2>&1 || true
+          godot --headless --import 2>&1 || true
 
       - name: Build Android APK (debug)
         run: |
           mkdir -p build/android
-          godot --headless --export-debug "Android" ./build/android/${EXPORT_NAME}.apk
+          godot --headless --verbose --export-debug "Android" "${GITHUB_WORKSPACE}/build/android/${EXPORT_NAME}.apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
