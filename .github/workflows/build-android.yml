@@ -37,6 +37,13 @@ jobs:
           yes | sdkmanager --licenses > /dev/null || true
           sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
 
+      - name: Install xvfb and Mesa OpenGL (software renderer for Godot editor)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb mesa-utils libgl1-mesa-glx libgl1-mesa-dri \
+            libfontconfig1 libxcursor1 libxinerama1 libxi6 libxrandr2 \
+            libasound2 libpulse0
+
       - name: Download Godot
         run: |
           GODOT_ZIP="Godot_v${GODOT_VERSION}-${GODOT_STATUS}_linux.x86_64.zip"
@@ -182,29 +189,34 @@ jobs:
           cat "$HOME/.config/godot/editor_settings-4.4.tres"
           echo "::endgroup::"
 
-      - name: Build Android APK (debug)
+      - name: Build Android APK (debug, xvfb + opengl3 editor)
         run: |
           mkdir -p build/android
-          echo "::group::settings file Godot will load (RIGHT before invocation)"
-          echo "--- editor_settings-4.4.tres ---"
+          echo "====== settings file RIGHT before invocation ======"
           cat "$HOME/.config/godot/editor_settings-4.4.tres"
-          echo "--- SHA256 ---"
+          echo "====== SHA256 ======"
           sha256sum "$HOME/.config/godot/editor_settings-4.4.tres"
-          echo "--- listing ~/.config/godot/ ---"
-          ls -la "$HOME/.config/godot/"
-          echo "::endgroup::"
+          echo "====== end header ======"
+
+          # Run Godot in REAL editor mode (not --headless) under xvfb with the
+          # opengl3 renderer. Under --headless, Android export plugin's
+          # EDITOR_DEF properties appear to not be registered, so EDITOR_GET()
+          # returns empty strings and can_export() silently fails. Running
+          # the full editor forces every plugin to register, so our loaded
+          # editor settings actually take effect.
           set +e
-          godot --headless --path "${GITHUB_WORKSPACE}" --verbose \
+          xvfb-run -a --server-args="-screen 0 1280x720x24" \
+            godot --rendering-driver opengl3 --path "${GITHUB_WORKSPACE}" --verbose \
             --export-debug "Android" \
             "${GITHUB_WORKSPACE}/build/android/${EXPORT_NAME}.apk" 2>&1 \
             | tee export.log
           EXIT=${PIPESTATUS[0]}
-          echo "::group::export exit code"
-          echo "$EXIT"
-          echo "::endgroup::"
-          echo "::group::settings file AFTER Godot ran (in case it overwrote)"
+          echo "====== export exit code: $EXIT ======"
+          echo "====== settings file AFTER Godot ran ======"
           cat "$HOME/.config/godot/editor_settings-4.4.tres"
-          echo "::endgroup::"
+          echo "====== last 80 lines of export.log ======"
+          tail -80 export.log
+          echo "====== end ======"
           exit $EXIT
 
       - name: Post diagnostic summary
