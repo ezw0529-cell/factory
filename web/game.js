@@ -33,7 +33,7 @@
   const creditsOverlay = document.getElementById("credits-overlay");
   const creditsScroll = document.getElementById("credits-scroll");
 
-  const BOSS_SCORE = 120;
+  const BOSS_SCORE = 220;
 
   const state = {
     running: false,
@@ -195,6 +195,13 @@
     state.obstacles.push({ type, sub, x, y: -h - 40, w, h, passed: false, phase: Math.random() * Math.PI * 2 });
   }
 
+  function spawnTanker() {
+    const w = 220 + Math.random() * 120;
+    const h = 90;
+    const x = 80 + Math.random() * (W - 160 - w);
+    state.obstacles.push({ type: 4, sub: null, x, y: -h - 40, w, h, passed: false, phase: Math.random() * Math.PI * 2 });
+  }
+
   // --- update ---
   function update(dt) {
     if (!state.running) return;
@@ -254,7 +261,8 @@
       if (state.phaseT >= 1.6) {
         state.phase = "boss";
         state.phaseT = 0;
-        state.obstacles = [];
+        // keep any in-flight obstacles (they'll scroll off)
+        // switch remaining land obstacles to tankers visually? no — just let them drift out
         state.boss = {
           x: W / 2,
           y: -200,
@@ -268,7 +276,7 @@
       }
     }
 
-    // spawn (only in normal phase)
+    // spawn (land obstacles in normal, tankers during approach/boss)
     if (state.phase === "normal") {
       state.spawnTimer -= dt;
       if (state.spawnTimer <= 0) {
@@ -277,6 +285,12 @@
         const minI = Math.max(0.28, SPAWN_MIN - ratio * 0.28);
         const maxI = Math.max(0.45, SPAWN_MAX - ratio * 0.5);
         state.spawnTimer = minI + Math.random() * (maxI - minI);
+      }
+    } else if (state.phase === "approach" || state.phase === "boss") {
+      state.spawnTimer -= dt;
+      if (state.spawnTimer <= 0) {
+        spawnTanker();
+        state.spawnTimer = 1.4 + Math.random() * 1.0;
       }
     }
 
@@ -968,7 +982,69 @@
       ctx.beginPath(); ctx.ellipse(cx, cy - 10, 12, 9, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#111";
       ctx.beginPath(); ctx.ellipse(cx, cy - 14, 5, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+    } else if (o.type === 4) {
+      drawTanker(o);
     }
+  }
+
+  function drawTanker(o) {
+    // top-down oil tanker: black hull, red smokestack, orange deck
+    const x = o.x, y = o.y, w = o.w, h = o.h;
+    // water wake behind
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.beginPath();
+    ctx.moveTo(x + 10, y - 6);
+    ctx.lineTo(x + w / 2 - 20, y - 28);
+    ctx.lineTo(x + w / 2 + 20, y - 28);
+    ctx.lineTo(x + w - 10, y - 6);
+    ctx.closePath();
+    ctx.fill();
+    // hull (rounded at bow, flat at stern)
+    ctx.fillStyle = "#1a1a22";
+    ctx.beginPath();
+    ctx.moveTo(x + 2, y + 6);
+    ctx.lineTo(x + w / 2 - 14, y);
+    ctx.lineTo(x + w / 2 + 14, y);
+    ctx.lineTo(x + w - 2, y + 6);
+    ctx.lineTo(x + w - 2, y + h - 4);
+    ctx.lineTo(x + 2, y + h - 4);
+    ctx.closePath();
+    ctx.fill();
+    // deck
+    ctx.fillStyle = "#c26a1f";
+    roundRect(x + 10, y + 12, w - 20, h - 28, 4); ctx.fill();
+    // deck tanks (orange cylinders top-down = circles)
+    ctx.fillStyle = "#e88a2a";
+    const tanks = Math.max(2, Math.floor(w / 70));
+    for (let i = 0; i < tanks; i++) {
+      const tx = x + 24 + i * ((w - 48) / tanks) + ((w - 48) / tanks) / 2;
+      ctx.beginPath();
+      ctx.arc(tx, y + h / 2 - 2, 14, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // piping
+    ctx.strokeStyle = "#888"; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x + 20, y + h / 2 - 2);
+    ctx.lineTo(x + w - 20, y + h / 2 - 2);
+    ctx.stroke();
+    // bridge (stern)
+    ctx.fillStyle = "#e8e0c8";
+    roundRect(x + 14, y + h - 26, 48, 20, 3); ctx.fill();
+    ctx.fillStyle = "#6aa3c6";
+    ctx.fillRect(x + 18, y + h - 22, 40, 6);
+    // red smokestack on bridge
+    ctx.fillStyle = "#c63030";
+    ctx.fillRect(x + 28, y + h - 14, 10, 10);
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(x + 30, y + h - 15, 6, 3);
+    // stripe + label
+    ctx.fillStyle = "#ffd84a";
+    ctx.fillRect(x + 68, y + h - 22, w - 88, 14);
+    ctx.fillStyle = "#1a1a1a";
+    ctx.font = "bold 12px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("유조선", x + 68 + (w - 88) / 2, y + h - 11);
   }
 
   function drawBoss() {
