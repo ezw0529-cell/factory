@@ -75,22 +75,6 @@ jobs:
           done
           echo "::endgroup::"
 
-      - name: Install Android gradle build template into project
-        run: |
-          TEMPLATE_DIR="${HOME}/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}"
-          BUILD_DIR="${GITHUB_WORKSPACE}/android/build"
-          mkdir -p "${BUILD_DIR}"
-          unzip -oq "${TEMPLATE_DIR}/android_source.zip" -d "${BUILD_DIR}"
-          # Ensure gradlew is executable.
-          if [ -f "${BUILD_DIR}/gradlew" ]; then
-            chmod +x "${BUILD_DIR}/gradlew"
-          fi
-          # Marker file required by Godot to recognize the installed template.
-          echo -n "" > "${BUILD_DIR}/.gdignore"
-          echo "::group::android/build/ contents"
-          ls -la "${BUILD_DIR}/" | head -40
-          echo "::endgroup::"
-
       - name: Generate debug keystore
         id: keystore
         run: |
