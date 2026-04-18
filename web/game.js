@@ -78,9 +78,9 @@
   }
 
   const DAEJEON_SIGNS = [
-    "둔산대로", "은행동", "대흥로", "갑천대로",
-    "계룡로", "중앙로", "월평동", "유성IC",
-    "대전역", "탄방동", "문화로",
+    "햇살로", "푸른동", "달빛로", "노을동",
+    "민들레로", "별빛동", "바람길", "미소로",
+    "새벽동", "꿈빛로",
   ];
 
   function makeScenery(y) {
@@ -103,18 +103,18 @@
   function spawnSungsimdang() {
     // big landmark — only spawned once per run, early
     const side = Math.random() < 0.5 ? "L" : "R";
-    const w = 132;
-    const h = 340;
-    const x = side === "L" ? -2 : W - w + 2;  // hug the sidewalk edge
+    const w = 200;
+    const h = 460;
+    const x = side === "L" ? -60 : W - w + 60;  // extends past the sidewalk
     state.scenery.push({ kind: "sungsimdang_big", x, y: -h - 40, w, h, label: null });
   }
 
   function spawnStadium() {
-    // big stadium landmark — extends past the sidewalk
+    // big stadium landmark — extends past the sidewalk, larger footprint
     const side = Math.random() < 0.5 ? "L" : "R";
-    const w = 210;
-    const h = 340;
-    const x = side === "L" ? -70 : W - w + 70;  // partially off-screen
+    const w = 340;
+    const h = 500;
+    const x = side === "L" ? -140 : W - w + 140;  // partially off-screen
     state.scenery.push({ kind: "stadium_big", x, y: -h - 40, w, h, side });
   }
 
@@ -264,14 +264,6 @@
 
     // scroll backgrounds
     state.roadOffset = (state.roadOffset + state.scroll * dt) % 160;
-    for (const c of state.clouds) {
-      c.y += state.scroll * 0.35 * dt;
-      if (c.y - c.r > H) {
-        c.y = -c.r;
-        c.x = Math.random() * W;
-        c.r = 40 + Math.random() * 50;
-      }
-    }
     for (let i = 0; i < state.scenery.length; i++) {
       const s = state.scenery[i];
       s.y += state.scroll * 0.9 * dt;
@@ -604,18 +596,6 @@
       for (const s of state.scenery) drawScenery(s);
     }
 
-    // soft clouds — only in strait/boss scene, not over the city road
-    if (isBossBg) {
-      ctx.fillStyle = "rgba(255, 200, 150, 0.3)";
-      for (const c of state.clouds) {
-        if (c.y > H * 0.5) continue;
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
-        ctx.arc(c.x + c.r * 0.7, c.y + 8, c.r * 0.7, 0, Math.PI * 2);
-        ctx.arc(c.x - c.r * 0.6, c.y + 6, c.r * 0.6, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
   }
 
   function drawPlayer() {
@@ -845,47 +825,47 @@
     ctx.moveTo(x + w / 2, rwY - 14); ctx.lineTo(x + w / 2, rwY + 14);
     ctx.stroke();
 
-    // vertical 성심당 signboard on the facade
-    const sbX = x + w - 32;
-    const sbY = y + 130;
+    // vertical 선심당 signboard on the facade (bigger/bolder)
+    const sbX = x + w - 46;
+    const sbY = y + 160;
     ctx.fillStyle = "#1a1a1a";
-    roundRect(sbX, sbY, 22, 140, 2); ctx.fill();
+    roundRect(sbX, sbY, 36, 220, 3); ctx.fill();
     ctx.fillStyle = "#ffd84a";
-    ctx.font = "bold 18px 'Apple SD Gothic Neo', sans-serif";
+    ctx.font = "bold 30px 'Apple SD Gothic Neo', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("선", sbX + 11, sbY + 28);
-    ctx.fillText("심", sbX + 11, sbY + 64);
-    ctx.fillText("당", sbX + 11, sbY + 100);
+    ctx.fillText("선", sbX + 18, sbY + 46);
+    ctx.fillText("심", sbX + 18, sbY + 108);
+    ctx.fillText("당", sbX + 18, sbY + 170);
 
-    // horizontal cream banner across facade
+    // horizontal cream banner across facade (bigger)
     ctx.fillStyle = "#f4ecd8";
-    roundRect(x + 10, y + 140, w - 50, 26, 2); ctx.fill();
-    ctx.strokeStyle = "#3a2a20"; ctx.lineWidth = 1;
-    ctx.strokeRect(x + 10, y + 140, w - 50, 26);
+    roundRect(x + 14, y + 180, w - 70, 40, 3); ctx.fill();
+    ctx.strokeStyle = "#3a2a20"; ctx.lineWidth = 2;
+    ctx.strokeRect(x + 14, y + 180, w - 70, 40);
     ctx.fillStyle = "#c2342a";
-    ctx.font = "bold 10px 'Apple SD Gothic Neo', sans-serif";
+    ctx.font = "bold 20px 'Apple SD Gothic Neo', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("포장水 40년", x + 10 + (w - 50) / 2, y + 156);
+    ctx.fillText("포장水 40년", x + 14 + (w - 70) / 2, y + 207);
 
-    // arched windows (2 rows of 2)
+    // arched windows (2 rows of 2, larger for the bigger facade)
     for (let r = 0; r < 2; r++) {
       for (let c = 0; c < 2; c++) {
-        const wx = x + 14 + c * ((w - 60) / 2);
-        const wy = y + 180 + r * 60;
+        const wx = x + 18 + c * ((w - 80) / 2);
+        const wy = y + 250 + r * 80;
         ctx.fillStyle = "#2a2a30";
         ctx.beginPath();
-        ctx.moveTo(wx, wy + 40);
-        ctx.lineTo(wx, wy + 12);
-        ctx.quadraticCurveTo(wx + 12, wy - 4, wx + 24, wy + 12);
-        ctx.lineTo(wx + 24, wy + 40);
+        ctx.moveTo(wx, wy + 56);
+        ctx.lineTo(wx, wy + 16);
+        ctx.quadraticCurveTo(wx + 16, wy - 6, wx + 32, wy + 16);
+        ctx.lineTo(wx + 32, wy + 56);
         ctx.closePath();
         ctx.fill();
         ctx.fillStyle = "#e8d8b8";
-        ctx.fillRect(wx + 2, wy + 14, 20, 24);
-        ctx.strokeStyle = "#3a2a20"; ctx.lineWidth = 1;
+        ctx.fillRect(wx + 3, wy + 18, 26, 34);
+        ctx.strokeStyle = "#3a2a20"; ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.moveTo(wx + 12, wy + 10); ctx.lineTo(wx + 12, wy + 38);
-        ctx.moveTo(wx + 2, wy + 24); ctx.lineTo(wx + 22, wy + 24);
+        ctx.moveTo(wx + 16, wy + 14); ctx.lineTo(wx + 16, wy + 54);
+        ctx.moveTo(wx + 3, wy + 34); ctx.lineTo(wx + 29, wy + 34);
         ctx.stroke();
       }
     }
@@ -1062,19 +1042,19 @@
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(cx - 2, cy + ry * 0.2 + 2, 4, 4);
 
-    // scoreboard on the near edge of the ring
+    // scoreboard on the near edge of the ring (larger)
     const sbSide = s.side === "L" ? 1 : -1; // face toward the road side
-    const sbx = cx + sbSide * (rx - 30);
+    const sbx = cx + sbSide * (rx - 44);
     const sby = cy - ry * 0.55;
     ctx.fillStyle = "#1a1a1a";
-    roundRect(sbx - 22, sby - 16, 44, 32, 3); ctx.fill();
+    roundRect(sbx - 36, sby - 24, 72, 50, 4); ctx.fill();
     ctx.fillStyle = "#ff7a2a";
-    ctx.font = "bold 10px sans-serif";
+    ctx.font = "bold 16px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("SCORE", sbx, sby - 4);
+    ctx.fillText("SCORE", sbx, sby - 6);
     ctx.fillStyle = "#ffd84a";
-    ctx.font = "bold 12px 'Apple SD Gothic Neo', sans-serif";
-    ctx.fillText("1 : 0", sbx, sby + 10);
+    ctx.font = "bold 20px 'Apple SD Gothic Neo', sans-serif";
+    ctx.fillText("1 : 0", sbx, sby + 18);
 
     // stadium light tower (tall post with light cluster)
     const ltx = cx + sbSide * (rx - 14);
