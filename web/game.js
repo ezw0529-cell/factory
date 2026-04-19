@@ -1868,9 +1868,9 @@
       ring.push({ a, x: Math.cos(a) * r * wobble, y: Math.sin(a) * r * wobble });
     }
 
-    // weighted rope ends hanging off the rim
-    ctx.strokeStyle = "#3a2810";
-    ctx.lineWidth = 2;
+    // weighted rope ends hanging off the rim — safety orange for visibility
+    ctx.strokeStyle = "#ff7a2a";
+    ctx.lineWidth = 2.5;
     for (let i = 0; i < points; i += 2) {
       const p = ring[i];
       const tx = p.x * 1.35;
@@ -1880,14 +1880,14 @@
       ctx.lineTo(tx, ty);
       ctx.stroke();
       // small weight at the end
-      ctx.fillStyle = "#2a1a08";
+      ctx.fillStyle = "#c0321a";
       ctx.beginPath();
-      ctx.arc(tx, ty, 3, 0, Math.PI * 2);
+      ctx.arc(tx, ty, 3.5, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // soft net "fabric" fill (translucent so you see through it)
-    ctx.fillStyle = "rgba(60, 42, 22, 0.25)";
+    // soft net "fabric" fill — translucent warm yellow so it pops on dark road
+    ctx.fillStyle = "rgba(255, 210, 80, 0.35)";
     ctx.beginPath();
     ctx.moveTo(ring[0].x, ring[0].y);
     for (let i = 1; i < points; i++) {
@@ -1905,8 +1905,8 @@
     ctx.save();
     ctx.clip();
     ctx.rotate(Math.PI / 4);
-    ctx.strokeStyle = "rgba(30, 18, 6, 0.85)";
-    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = "rgba(220, 60, 30, 0.9)";
+    ctx.lineWidth = 1.6;
     const step = 9;
     const span = r * 1.6;
     for (let i = -span; i <= span; i += step) {
@@ -1919,8 +1919,8 @@
       ctx.lineTo(i, span);
       ctx.stroke();
     }
-    // knots at intersections
-    ctx.fillStyle = "rgba(20, 12, 4, 0.95)";
+    // knots at intersections — bright yellow dots
+    ctx.fillStyle = "rgba(255, 230, 100, 0.95)";
     for (let i = -span; i <= span; i += step) {
       for (let j = -span; j <= span; j += step) {
         if ((i * i + j * j) < r * r * 1.2) {
@@ -1930,8 +1930,23 @@
     }
     ctx.restore();
 
-    // rope rim — thick outer cord following the irregular outline
-    ctx.strokeStyle = "#3a2614";
+    // dark outer glow for extra contrast on bright backgrounds
+    ctx.strokeStyle = "rgba(40, 20, 10, 0.7)";
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(ring[0].x, ring[0].y);
+    for (let i = 1; i < points; i++) {
+      const prev = ring[i - 1];
+      const cur = ring[i];
+      const mx = (prev.x + cur.x) / 2;
+      const my = (prev.y + cur.y) / 2;
+      ctx.quadraticCurveTo(prev.x, prev.y, mx, my);
+    }
+    ctx.quadraticCurveTo(ring[points - 1].x, ring[points - 1].y, ring[0].x, ring[0].y);
+    ctx.stroke();
+
+    // rope rim — thick bright orange outer cord
+    ctx.strokeStyle = "#ff7a2a";
     ctx.lineWidth = 3.5;
     ctx.beginPath();
     ctx.moveTo(ring[0].x, ring[0].y);
@@ -2960,7 +2975,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.26";
+  const CURRENT_VERSION = "v1.4.27";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
