@@ -515,8 +515,6 @@
 
   function victory() {
     state.running = false;
-    audio.sfx.victory();
-    audio.startBgm("victory");
     if (state.score > state.best) {
       state.best = state.score;
       localStorage.setItem(BEST_KEY, String(state.best));
@@ -816,6 +814,8 @@
         if (b.y > KILL_LINE) {
           b.dead = true;
           b.deadT = 0;
+          audio.sfx.victory();
+          audio.startBgm("victory");
         } else {
           // only fire while above the kill line
           b.fireTimer -= dt;
