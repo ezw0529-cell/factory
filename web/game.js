@@ -60,6 +60,13 @@
     bullets: [],
     sungsimdangSpawned: false,
     stadiumSpawned: false,
+    femaleSpawned: false,
+    breadDropQueue: 0, // number of bread items still to drop after 성심당
+    breadDropTimer: 0,
+    bonusTimer: 6.0,
+    bonusPoints: 0,
+    goraniTimer: 9.0,
+    scoreFloats: [], // { x, y, t, text }
     reveal: null, // { x, y, t } when "암컷 → 수컷" flip is playing
   };
 
@@ -143,6 +150,13 @@
     state.bullets = [];
     state.sungsimdangSpawned = false;
     state.stadiumSpawned = false;
+    state.femaleSpawned = false;
+    state.breadDropQueue = 0;
+    state.breadDropTimer = 0;
+    state.bonusTimer = 6.0;
+    state.bonusPoints = 0;
+    state.goraniTimer = 9.0;
+    state.scoreFloats = [];
     state.reveal = null;
     // zoo gate behind the wolf at the very start
     state.scenery.push({ kind: "zoo_gate", x: 0, y: 260, w: W, h: 320 });
@@ -205,15 +219,13 @@
   function spawnObstacle() {
     const kind = Math.random();
     let type, w, h, sub = null;
-    if (kind < 0.4) {
+    if (kind < 0.55) {
       type = 0; w = 110; h = 150;
       sub = PERSON_KINDS[Math.floor(Math.random() * PERSON_KINDS.length)];
-    } else if (kind < 0.6) {
+    } else if (kind < 0.8) {
       type = 1; w = 220 + Math.random() * 160; h = 70;
-    } else if (kind < 0.72) {
-      type = 2; w = 110; h = 110;
     } else {
-      type = 3; w = 120; h = 150;
+      type = 2; w = 110; h = 110;
     }
     const x = PLAYER_MARGIN + Math.random() * (W - PLAYER_MARGIN * 2 - w);
     const o = { type, sub, x, y: -h - 40, w, h, passed: false, phase: Math.random() * Math.PI * 2 };
@@ -225,6 +237,30 @@
       o.throwAtY = 180 + Math.random() * 180;
     }
     state.obstacles.push(o);
+  }
+
+  function spawnFemaleWolf() {
+    const w = 120, h = 150;
+    const x = PLAYER_MARGIN + Math.random() * (W - PLAYER_MARGIN * 2 - w);
+    state.obstacles.push({ type: 3, sub: null, x, y: -h - 40, w, h, passed: false, phase: Math.random() * Math.PI * 2 });
+  }
+
+  const BONUS_KINDS = ["bread", "bone", "chew"];
+  function spawnBonus(sub) {
+    const w = 80, h = 80;
+    const x = PLAYER_MARGIN + Math.random() * (W - PLAYER_MARGIN * 2 - w);
+    state.obstacles.push({ type: 5, sub, x, y: -h - 40, w, h, passed: false, phase: Math.random() * Math.PI * 2 });
+  }
+
+  function spawnGorani() {
+    const w = 120, h = 160;
+    const x = PLAYER_MARGIN + Math.random() * (W - PLAYER_MARGIN * 2 - w);
+    // charges down fast — extra vy on top of scroll
+    state.obstacles.push({
+      type: 6, sub: null, x, y: -h - 40, w, h,
+      passed: false, phase: Math.random() * Math.PI * 2,
+      vy: 620,
+    });
   }
 
   function spawnTanker() {
@@ -251,7 +287,7 @@
 
     state.scroll = Math.min(SCROLL_MAX, state.scroll + SCROLL_ACCEL * dt);
     state.distance += state.scroll * dt;
-    const newScore = Math.floor(state.distance / 25);
+    const newScore = Math.floor(state.distance / 25) + state.bonusPoints;
     if (newScore !== state.score) {
       state.score = newScore;
       scoreEl.textContent = "점수 " + state.score;
@@ -288,11 +324,45 @@
     if (!state.sungsimdangSpawned && state.phase === "normal" && state.distance > 2600) {
       state.sungsimdangSpawned = true;
       spawnSungsimdang();
+      // 성심당 옆에 빵 보너스 3개 연속으로 떨어뜨림
+      state.breadDropQueue = 3;
+      state.breadDropTimer = 1.2;
+    }
+    // drop bread items after 성심당
+    if (state.breadDropQueue > 0) {
+      state.breadDropTimer -= dt;
+      if (state.breadDropTimer <= 0) {
+        spawnBonus("bread");
+        state.breadDropQueue -= 1;
+        state.breadDropTimer = 0.9 + Math.random() * 0.3;
+      }
+    }
+    // one-time female wolf trap (looks like bonus — but actually a trap)
+    if (!state.femaleSpawned && state.phase === "normal" && state.distance > 5000) {
+      state.femaleSpawned = true;
+      spawnFemaleWolf();
     }
     // mid landmark: baseball stadium (spaced out with doubled boss timer)
     if (!state.stadiumSpawned && state.phase === "normal" && state.distance > 6500) {
       state.stadiumSpawned = true;
       spawnStadium();
+    }
+    // periodic bone/chew bonus items during normal phase
+    if (state.phase === "normal" && state.distance > 3500) {
+      state.bonusTimer -= dt;
+      if (state.bonusTimer <= 0) {
+        const sub = Math.random() < 0.5 ? "bone" : "chew";
+        spawnBonus(sub);
+        state.bonusTimer = 7 + Math.random() * 5;
+      }
+    }
+    // 고라니 돌진 — 빠르게 내려오는 장애물
+    if (state.phase === "normal" && state.distance > 2000) {
+      state.goraniTimer -= dt;
+      if (state.goraniTimer <= 0) {
+        spawnGorani();
+        state.goraniTimer = 7 + Math.random() * 4;
+      }
     }
 
     // phase transition into boss
@@ -344,7 +414,7 @@
 
     // move obstacles + keeper net throws
     for (const o of state.obstacles) {
-      o.y += state.scroll * dt;
+      o.y += (state.scroll + (o.vy || 0)) * dt;
       if (o.throws && !o.thrown && o.y >= o.throwAtY) {
         o.thrown = true;
         // net aims for player's current x, lobbing downward
@@ -439,16 +509,31 @@
     }
 
     // obstacle collision (extra padding on obstacle sides too)
-    for (const o of state.obstacles) {
+    for (let i = 0; i < state.obstacles.length; i++) {
+      const o = state.obstacles[i];
       if (px1 < o.x + o.w - 14 && px2 > o.x + 14 && py1 < o.y + o.h - 14 && py2 > o.y + 14) {
         if (o.type === 3) {
           state.reveal = { x: o.x + o.w / 2, y: o.y + o.h / 2, t: 0 };
+          return;
+        } else if (o.type === 5) {
+          // bonus item — +100 score, floating popup, no death
+          state.bonusPoints += 100;
+          state.score += 100;
+          scoreEl.textContent = "점수 " + state.score;
+          state.scoreFloats.push({ x: o.x + o.w / 2, y: o.y + o.h / 2, t: 0, text: "+100" });
+          state.obstacles.splice(i, 1);
+          i--;
+          continue;
         } else {
           gameOver();
+          return;
         }
-        return;
       }
     }
+
+    // score float popups
+    for (const f of state.scoreFloats) f.t += dt;
+    state.scoreFloats = state.scoreFloats.filter((f) => f.t < 1.0);
 
     if (state.shake > 0) state.shake = Math.max(0, state.shake - dt * 60);
   }
@@ -1572,6 +1657,208 @@
       ctx.stroke();
     } else if (o.type === 4) {
       drawTanker(o);
+    } else if (o.type === 5) {
+      drawBonus(o);
+    } else if (o.type === 6) {
+      drawGorani(o);
+    }
+  }
+
+  function drawGorani(o) {
+    const cx = o.x + o.w / 2;
+    const cy = o.y + o.h / 2;
+    const t = performance.now() / 80 + o.phase; // fast gallop
+    const bob = Math.sin(t) * 3;
+    const yy = cy + bob;
+    // speed streak above (showing charge)
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) {
+      const sx = cx - 24 + i * 16;
+      ctx.beginPath();
+      ctx.moveTo(sx, cy - o.h * 0.7);
+      ctx.lineTo(sx + 4, cy - o.h * 0.35);
+      ctx.stroke();
+    }
+    // shadow
+    ctx.fillStyle = "rgba(0,0,0,0.32)";
+    ctx.beginPath();
+    ctx.ellipse(cx, yy + 60, 50, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // legs (gallop pose — front pair forward, back pair back)
+    ctx.fillStyle = "#6a4a2a";
+    const legOff = Math.sin(t) * 4;
+    roundRect(cx - 30, yy - 38 + legOff, 10, 32, 4); ctx.fill();
+    roundRect(cx + 20, yy - 38 - legOff, 10, 32, 4); ctx.fill();
+    roundRect(cx - 28, yy + 28 - legOff, 10, 32, 4); ctx.fill();
+    roundRect(cx + 18, yy + 28 + legOff, 10, 32, 4); ctx.fill();
+    // dark hooves
+    ctx.fillStyle = "#2a1a0e";
+    ctx.fillRect(cx - 31, yy - 8 + legOff, 12, 5);
+    ctx.fillRect(cx + 19, yy - 8 - legOff, 12, 5);
+    ctx.fillRect(cx - 29, yy + 58 - legOff, 12, 5);
+    ctx.fillRect(cx + 17, yy + 58 + legOff, 12, 5);
+    // body — warm brown elongated oval (helicopter top-down view)
+    ctx.fillStyle = "#a07848";
+    ctx.beginPath();
+    ctx.ellipse(cx, yy + 6, 42, 56, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // darker back stripe
+    ctx.fillStyle = "#6f5028";
+    ctx.beginPath();
+    ctx.ellipse(cx, yy + 2, 14, 48, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // white rump patch
+    ctx.fillStyle = "#f2e4c8";
+    ctx.beginPath();
+    ctx.ellipse(cx, yy + 52, 12, 14, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // head (smaller, forward)
+    ctx.fillStyle = "#8a6638";
+    ctx.beginPath();
+    ctx.ellipse(cx, yy - 52, 22, 28, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // ears (small, pointed forward)
+    ctx.fillStyle = "#6a4a2a";
+    ctx.beginPath();
+    ctx.moveTo(cx - 22, yy - 70); ctx.lineTo(cx - 14, yy - 86); ctx.lineTo(cx - 8, yy - 64); ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx + 22, yy - 70); ctx.lineTo(cx + 14, yy - 86); ctx.lineTo(cx + 8, yy - 64); ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#d69a7a";
+    ctx.beginPath();
+    ctx.moveTo(cx - 18, yy - 72); ctx.lineTo(cx - 14, yy - 82); ctx.lineTo(cx - 10, yy - 66); ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx + 18, yy - 72); ctx.lineTo(cx + 14, yy - 82); ctx.lineTo(cx + 10, yy - 66); ctx.closePath();
+    ctx.fill();
+    // snout
+    ctx.fillStyle = "#b08860";
+    ctx.beginPath();
+    ctx.ellipse(cx, yy - 68, 9, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // eyes — angry wild look
+    ctx.fillStyle = "#f4c030";
+    ctx.beginPath();
+    ctx.arc(cx - 9, yy - 55, 3, 0, Math.PI * 2);
+    ctx.arc(cx + 9, yy - 55, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#1a1a1a";
+    ctx.beginPath();
+    ctx.arc(cx - 9, yy - 55, 1.4, 0, Math.PI * 2);
+    ctx.arc(cx + 9, yy - 55, 1.4, 0, Math.PI * 2);
+    ctx.fill();
+    // nose
+    ctx.fillStyle = "#1a1a1a";
+    ctx.beginPath();
+    ctx.ellipse(cx, yy - 75, 3, 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // fangs (고라니 특징 — 위턱에서 살짝 나온 송곳니)
+    ctx.fillStyle = "#f8f4e8";
+    ctx.beginPath();
+    ctx.moveTo(cx - 5, yy - 70); ctx.lineTo(cx - 6, yy - 62); ctx.lineTo(cx - 3, yy - 70); ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx + 5, yy - 70); ctx.lineTo(cx + 6, yy - 62); ctx.lineTo(cx + 3, yy - 70); ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawBonus(o) {
+    const cx = o.x + o.w / 2;
+    const cy = o.y + o.h / 2;
+    const t = performance.now() / 500 + o.phase;
+    // pink heart aura — intentionally matches the female wolf decoy's visual style
+    ctx.fillStyle = "rgba(255, 120, 160, 0.55)";
+    for (let i = 0; i < 4; i++) {
+      const a = t + i * Math.PI / 2;
+      const hx = cx + Math.cos(a) * (o.w / 2 + 12);
+      const hy = cy + Math.sin(a) * (o.h / 2 + 8);
+      ctx.beginPath();
+      ctx.arc(hx - 5, hy, 6, 0, Math.PI * 2);
+      ctx.arc(hx + 5, hy, 6, 0, Math.PI * 2);
+      ctx.moveTo(hx - 11, hy + 2);
+      ctx.lineTo(hx, hy + 14);
+      ctx.lineTo(hx + 11, hy + 2);
+      ctx.fill();
+    }
+    // gentle bob
+    const bob = Math.sin(t * 1.3) * 3;
+    const yy = cy + bob;
+    if (o.sub === "bread") {
+      // 튀김소보로 — warm brown round bread with light highlights
+      ctx.fillStyle = "#8a4a1a";
+      ctx.beginPath();
+      ctx.ellipse(cx, yy, 28, 22, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // crusty top texture
+      ctx.fillStyle = "#b86a28";
+      for (let r = 0; r < 10; r++) {
+        const ang = r * 0.7;
+        const rx = cx + Math.cos(ang) * 16;
+        const ry = yy + Math.sin(ang) * 10 - 4;
+        ctx.beginPath(); ctx.arc(rx, ry, 4, 0, Math.PI * 2); ctx.fill();
+      }
+      // highlight
+      ctx.fillStyle = "rgba(255, 220, 150, 0.55)";
+      ctx.beginPath();
+      ctx.ellipse(cx - 8, yy - 8, 10, 4, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (o.sub === "bone") {
+      // dog bone — two rounded knobs with a shaft
+      ctx.save();
+      ctx.translate(cx, yy);
+      ctx.rotate(Math.sin(t * 0.6) * 0.15);
+      ctx.fillStyle = "#f6ecd2";
+      roundRect(-26, -8, 52, 16, 8); ctx.fill();
+      ctx.beginPath();
+      ctx.arc(-26, -6, 9, 0, Math.PI * 2);
+      ctx.arc(-26, 6, 9, 0, Math.PI * 2);
+      ctx.arc(26, -6, 9, 0, Math.PI * 2);
+      ctx.arc(26, 6, 9, 0, Math.PI * 2);
+      ctx.fill();
+      // shading
+      ctx.fillStyle = "rgba(180, 160, 110, 0.4)";
+      roundRect(-22, 2, 44, 5, 3); ctx.fill();
+      ctx.restore();
+    } else if (o.sub === "chew") {
+      // dog chew — twisted rawhide stick
+      ctx.save();
+      ctx.translate(cx, yy);
+      ctx.rotate(-0.3);
+      ctx.fillStyle = "#e8cfa2";
+      roundRect(-26, -8, 52, 16, 6); ctx.fill();
+      // twisted ends
+      ctx.beginPath();
+      ctx.arc(-26, 0, 10, 0, Math.PI * 2);
+      ctx.arc(26, 0, 10, 0, Math.PI * 2);
+      ctx.fill();
+      // swirl lines
+      ctx.strokeStyle = "#b08848"; ctx.lineWidth = 1.5;
+      for (let i = -20; i <= 20; i += 8) {
+        ctx.beginPath();
+        ctx.moveTo(i, -7);
+        ctx.quadraticCurveTo(i + 4, 0, i, 7);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
+  function drawScoreFloats() {
+    for (const f of state.scoreFloats) {
+      const alpha = 1 - f.t;
+      const dy = -60 * f.t;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = "#ffd84a";
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 4;
+      ctx.font = "bold 36px 'Apple SD Gothic Neo', sans-serif";
+      ctx.textAlign = "center";
+      ctx.strokeText(f.text, f.x, f.y + dy);
+      ctx.fillText(f.text, f.x, f.y + dy);
+      ctx.restore();
     }
   }
 
@@ -1899,6 +2186,7 @@
     if (state.phase === "boss" || state.phase === "victory") drawBoss();
     for (const bt of state.bullets) drawBullet(bt);
     drawBossAnnounce();
+    drawScoreFloats();
     if (state.reveal) drawReveal();
     ctx.restore();
   }
