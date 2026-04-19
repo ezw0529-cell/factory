@@ -2913,9 +2913,9 @@
     const score = state.score;
     let text;
     if (kind === "victory") {
-      text = `늑구 탈출 엔딩까지 돌파! 🐺 최종 ${score}점`;
+      text = `자유를 찾아 떠난 늑구, 엔딩까지 돌파! 🐺 최종 ${score}점`;
     } else {
-      text = `늑구런 ${score}점에서 잡혔다 🐺 너는 얼마나 가?`;
+      text = `자유를 향해 ${score}점... 늑구런에서 잡혔다 🐺 너는 얼마나 가?`;
     }
     const fullText = `${text}\n${url}`;
     audio.ensure();
