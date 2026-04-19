@@ -206,6 +206,10 @@
       overTitleEl.textContent = "최종 보스에게 잡혔다";
       overSubEl.textContent = "해협은 지켜졌다.";
       overSubEl.classList.remove("hidden");
+    } else if (reason === "net") {
+      overTitleEl.textContent = "그물에 걸렸다!";
+      overSubEl.textContent = "사육사의 손길을 피하지 못했다.";
+      overSubEl.classList.remove("hidden");
     } else {
       overTitleEl.textContent = "잡혔다!";
       overSubEl.classList.add("hidden");
@@ -507,7 +511,7 @@
       const dx = bt.x - p.x;
       const dy = bt.y - PLAYER_Y;
       if (Math.hypot(dx, dy) < bt.r + 24) {
-        gameOver("trump");
+        gameOver(bt.kind === "net" ? "net" : "trump");
         return;
       }
     }
