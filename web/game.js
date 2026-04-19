@@ -1417,13 +1417,12 @@
     const y = o.y;
     const h = o.h;
 
-    // 역할별 팔레트
+    // 사육사 기본 팔레트 — 포획반은 모자 색만 다름
     let uniform = "#7a6a3e", cap = "#4a5c2e", accent = "#d4c18b";
-    let handColor = "#f2c29b";
     if (o.sub === "capture") {
-      uniform = "#2e3a26"; cap = "#0f1410"; accent = "#c22820"; handColor = "#151515";
+      cap = "#c22820"; // 빨간 모자로 그물 담당 구분
     } else if (o.sub === "vet") {
-      uniform = "#d6dde3"; cap = "#1a1f24"; accent = "#b8222a"; handColor = "#2a2a2a";
+      uniform = "#f0f4f6"; cap = "#d8dfe2"; accent = "#2a9a88";
     }
 
     // shadow
@@ -1441,99 +1440,49 @@
     // belt
     ctx.fillStyle = "#1a1a1a";
     ctx.fillRect(cx - o.w * 0.4, y + h * 0.65, o.w * 0.8, 6);
-    // arms extended
+    // arms extended (trying to catch)
     ctx.fillStyle = uniform;
     roundRect(cx - o.w * 0.58, y + h * 0.32, 18, h * 0.35, 8); ctx.fill();
     roundRect(cx + o.w * 0.58 - 18, y + h * 0.32, 18, h * 0.35, 8); ctx.fill();
     // hands
-    ctx.fillStyle = handColor;
+    ctx.fillStyle = "#f2c29b";
     ctx.beginPath();
     ctx.arc(cx - o.w * 0.58 + 9, y + h * 0.67, 10, 0, Math.PI * 2);
     ctx.arc(cx + o.w * 0.58 - 9, y + h * 0.67, 10, 0, Math.PI * 2);
     ctx.fill();
-
-    // 역할별 가슴 디테일
-    if (o.sub === "capture") {
-      // 붉은 전술 벨트
-      ctx.fillStyle = accent;
-      ctx.fillRect(cx - o.w * 0.4, y + h * 0.46, o.w * 0.8, 6);
-      // 어깨 가로지르는 포획망 감김
-      ctx.strokeStyle = "#6b4820"; ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.moveTo(cx - o.w * 0.42, y + h * 0.34);
-      ctx.lineTo(cx + o.w * 0.42, y + h * 0.58);
-      ctx.stroke();
-      ctx.strokeStyle = "#3a2610"; ctx.lineWidth = 1.5;
-      ctx.stroke();
-    } else if (o.sub === "vet") {
-      // 적십자 배지
-      ctx.fillStyle = accent;
-      ctx.fillRect(cx - 4, y + h * 0.40, 8, 22);
-      ctx.fillRect(cx - 11, y + h * 0.46, 22, 10);
-    }
-
     // head
     ctx.fillStyle = "#f2c29b";
     ctx.beginPath();
     ctx.arc(cx, y + h * 0.2, 22, 0, Math.PI * 2);
     ctx.fill();
-
-    // cap / helmet
+    // cap
     ctx.fillStyle = cap;
     ctx.beginPath();
     ctx.arc(cx, y + h * 0.14, 22, Math.PI, 0);
     ctx.fill();
     ctx.fillRect(cx - 22, y + h * 0.14, 44, 6);
+    // cap brim
     ctx.fillStyle = "#111";
     ctx.fillRect(cx - 26, y + h * 0.14 + 4, 52, 4);
-
-    if (o.sub === "zookeeper") {
-      // 노란 엠블럼
-      ctx.fillStyle = accent;
-      ctx.beginPath();
-      ctx.arc(cx, y + h * 0.08, 4, 0, Math.PI * 2);
-      ctx.fill();
-      // 눈
-      ctx.fillStyle = "#1a1a1a";
-      ctx.beginPath();
-      ctx.arc(cx - 6, y + h * 0.22, 2, 0, Math.PI * 2);
-      ctx.arc(cx + 6, y + h * 0.22, 2, 0, Math.PI * 2);
-      ctx.fill();
-      // 입
-      ctx.strokeStyle = "#1a1a1a"; ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(cx - 5, y + h * 0.26);
-      ctx.lineTo(cx + 5, y + h * 0.26);
-      ctx.stroke();
-    } else if (o.sub === "capture") {
-      // 헬멧 상단 붉은 밴드
-      ctx.fillStyle = accent;
-      ctx.fillRect(cx - 22, y + h * 0.115, 44, 4);
-      // 바이저
-      ctx.fillStyle = "#0a0a0a";
-      ctx.fillRect(cx - 20, y + h * 0.19, 40, 8);
-      // 턱끈 느낌의 스트로크
-      ctx.strokeStyle = "#333"; ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(cx, y + h * 0.2, 22, 0.1 * Math.PI, 0.9 * Math.PI, false);
-      ctx.stroke();
-    } else if (o.sub === "vet") {
-      // 다크 고글
-      ctx.fillStyle = "#0a0a0a";
-      ctx.fillRect(cx - 18, y + h * 0.20, 36, 7);
-      // 수술용 마스크
-      ctx.fillStyle = "#c2c8cc";
-      roundRect(cx - 14, y + h * 0.24, 28, 10, 3); ctx.fill();
-      ctx.strokeStyle = "#888"; ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(cx - 14, y + h * 0.28);
-      ctx.lineTo(cx + 14, y + h * 0.28);
-      ctx.stroke();
-      // 캡 적십자 포인트
-      ctx.fillStyle = accent;
-      ctx.fillRect(cx - 2, y + h * 0.06, 4, 10);
-      ctx.fillRect(cx - 5, y + h * 0.09, 10, 4);
-      // 청진기
+    // cap emblem
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.arc(cx, y + h * 0.08, 4, 0, Math.PI * 2);
+    ctx.fill();
+    // eyes
+    ctx.fillStyle = "#1a1a1a";
+    ctx.beginPath();
+    ctx.arc(cx - 6, y + h * 0.22, 2, 0, Math.PI * 2);
+    ctx.arc(cx + 6, y + h * 0.22, 2, 0, Math.PI * 2);
+    ctx.fill();
+    // mouth (determined line)
+    ctx.strokeStyle = "#1a1a1a"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 5, y + h * 0.26);
+    ctx.lineTo(cx + 5, y + h * 0.26);
+    ctx.stroke();
+    // vet-only: stethoscope draped over shoulders
+    if (o.sub === "vet") {
       ctx.strokeStyle = "#1a1a1a"; ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(cx - 18, y + h * 0.34);
