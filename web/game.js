@@ -227,7 +227,7 @@
       overSubEl.classList.remove("hidden");
     } else if (reason === "trump") {
       overTitleEl.textContent = "최종 보스에게 잡혔다";
-      overSubEl.textContent = "해협은 지켜졌다.";
+      overSubEl.textContent = "해협은 봉쇄됐다.";
       overSubEl.classList.remove("hidden");
     } else if (reason === "net") {
       overTitleEl.textContent = "그물에 걸렸다!";
