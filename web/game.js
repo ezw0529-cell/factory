@@ -210,6 +210,14 @@
       overTitleEl.textContent = "그물에 걸렸다!";
       overSubEl.textContent = "사육사의 손길을 피하지 못했다.";
       overSubEl.classList.remove("hidden");
+    } else if (reason === "dart") {
+      overTitleEl.textContent = "마취탄 명중";
+      overSubEl.textContent = "경찰의 정조준을 피하지 못했다.";
+      overSubEl.classList.remove("hidden");
+    } else if (reason === "water") {
+      overTitleEl.textContent = "물대포에 휩쓸렸다!";
+      overSubEl.textContent = "소방관이 진압했다.";
+      overSubEl.classList.remove("hidden");
     } else {
       overTitleEl.textContent = "잡혔다!";
       overSubEl.classList.add("hidden");
@@ -249,12 +257,17 @@
     }
     const x = PLAYER_MARGIN + Math.random() * (W - PLAYER_MARGIN * 2 - w);
     const o = { type, sub, x, y: -h - 40, w, h, passed: false, phase: Math.random() * Math.PI * 2 };
-    // net-throwing: zookeepers/police have ~55% chance to throw a net at the player
-    if (type === 0 && (sub === "zookeeper" || sub === "police") && Math.random() < 0.55) {
-      o.throws = true;
-      o.thrown = false;
-      // throw when mid-screen (y reaches this threshold)
-      o.throwAtY = 180 + Math.random() * 180;
+    // ranged attacks — different projectile per person type
+    if (type === 0 && Math.random() < 0.6) {
+      let kind = null;
+      if (sub === "zookeeper") kind = "net";
+      else if (sub === "police") kind = "dart";
+      else if (sub === "rescue") kind = "water";
+      if (kind) {
+        o.throws = kind;
+        o.thrown = false;
+        o.throwAtY = 180 + Math.random() * 180;
+      }
     }
     state.obstacles.push(o);
   }
@@ -425,21 +438,25 @@
       o.y += (state.scroll + (o.vy || 0)) * dt;
       if (o.throws && !o.thrown && o.y >= o.throwAtY) {
         o.thrown = true;
-        // net aims for player's current x, lobbing downward
         const nx = o.x + o.w / 2;
         const ny = o.y + o.h * 0.4;
+        // skip firing if the keeper is already too close vertically — unfair since player only moves left/right
+        if (PLAYER_Y - ny < 360) continue;
         const tx = p.x;
         const ty = PLAYER_Y;
         const dx = tx - nx;
         const dy = Math.max(40, ty - ny);
         const mag = Math.hypot(dx, dy) || 1;
-        const speed = 380;
+        let speed, r;
+        if (o.throws === "dart") { speed = 780; r = 14; }       // 경찰 마취총 — 빠르고 작음
+        else if (o.throws === "water") { speed = 520; r = 28; } // 소방관 물대포 — 중간 속도, 큰 범위
+        else { speed = 360; r = 30; }                           // 사육사 그물 — 느리고 큼
         state.bullets.push({
-          kind: "net",
+          kind: o.throws,
           x: nx, y: ny,
           vx: dx / mag * speed,
           vy: dy / mag * speed,
-          r: 30,
+          r,
           spin: 0,
         });
       }
@@ -511,7 +528,8 @@
       const dx = bt.x - p.x;
       const dy = bt.y - PLAYER_Y;
       if (Math.hypot(dx, dy) < bt.r + 24) {
-        gameOver(bt.kind === "net" ? "net" : "trump");
+        const reason = (bt.kind === "net" || bt.kind === "dart" || bt.kind === "water") ? bt.kind : "trump";
+        gameOver(reason);
         return;
       }
     }
@@ -1507,6 +1525,14 @@
       drawNet(bt);
       return;
     }
+    if (bt.kind === "dart") {
+      drawDart(bt);
+      return;
+    }
+    if (bt.kind === "water") {
+      drawWater(bt);
+      return;
+    }
     ctx.save();
     ctx.translate(bt.x, bt.y);
     ctx.rotate(bt.spin);
@@ -1533,6 +1559,78 @@
     ctx.textBaseline = "middle";
     ctx.fillText("$", bt.x, bt.y);
     ctx.textBaseline = "alphabetic";
+  }
+
+  function drawDart(bt) {
+    // 마취총 탄 — 빠른 작은 주사바늘 모양
+    const cx = bt.x, cy = bt.y;
+    const ang = Math.atan2(bt.vy, bt.vx);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(ang);
+    // motion trail
+    ctx.strokeStyle = "rgba(220, 230, 255, 0.6)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-30, 0);
+    ctx.lineTo(-bt.r - 2, 0);
+    ctx.stroke();
+    // body (glass tube with colored liquid)
+    ctx.fillStyle = "#d0d6e0";
+    roundRect(-bt.r, -4, bt.r * 1.6, 8, 2); ctx.fill();
+    ctx.fillStyle = "#7a4aa8";
+    ctx.fillRect(-bt.r + 2, -3, bt.r * 1.2, 6);
+    // needle tip
+    ctx.fillStyle = "#b8b8c0";
+    ctx.beginPath();
+    ctx.moveTo(bt.r * 0.6, -3);
+    ctx.lineTo(bt.r + 4, 0);
+    ctx.lineTo(bt.r * 0.6, 3);
+    ctx.closePath();
+    ctx.fill();
+    // feather fletching at back
+    ctx.fillStyle = "#c02a2a";
+    ctx.beginPath();
+    ctx.moveTo(-bt.r, -4);
+    ctx.lineTo(-bt.r - 5, -6);
+    ctx.lineTo(-bt.r - 5, 6);
+    ctx.lineTo(-bt.r, 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawWater(bt) {
+    // 물대포 물덩이 — 반투명 파란 물방울 + 튀는 방울
+    const cx = bt.x, cy = bt.y, r = bt.r;
+    const ang = Math.atan2(bt.vy, bt.vx);
+    // motion trail (stretched water)
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(ang);
+    ctx.fillStyle = "rgba(100, 180, 230, 0.35)";
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.4, 0, r * 1.4, r * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // main water ball
+    ctx.fillStyle = "rgba(80, 160, 220, 0.85)";
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(160, 220, 255, 0.95)";
+    ctx.beginPath(); ctx.arc(cx - r * 0.3, cy - r * 0.3, r * 0.45, 0, Math.PI * 2); ctx.fill();
+    // splash droplets
+    ctx.fillStyle = "rgba(120, 200, 240, 0.7)";
+    for (let i = 0; i < 4; i++) {
+      const a = i * Math.PI / 2 + bt.spin;
+      const dx = Math.cos(a) * (r + 8);
+      const dy = Math.sin(a) * (r + 8);
+      ctx.beginPath(); ctx.arc(cx + dx, cy + dy, 3, 0, Math.PI * 2); ctx.fill();
+    }
+    // highlight
+    ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r - 1, -Math.PI * 0.8, -Math.PI * 0.3);
+    ctx.stroke();
   }
 
   function drawNet(bt) {
