@@ -7,15 +7,15 @@
   const PLAYER_Y = 980;
   const PLAYER_MARGIN = 30;
 
-  const SCROLL_START = 340;
+  const SCROLL_START = 300;
   const SCROLL_MAX = 1000;
   const SCROLL_ACCEL = 8;
   const SCROLL_RAMP_DIST = 9000;
 
   const OBS_W = 120;
   const OBS_H = 130;
-  const SPAWN_MIN = 1.05;
-  const SPAWN_MAX = 1.95;
+  const SPAWN_MIN = 1.35;
+  const SPAWN_MAX = 2.60;
 
   const STEER_SPEED = 1800;
 
@@ -44,7 +44,7 @@
     distance: 0,
     score: 0,
     best: Number(localStorage.getItem(BEST_KEY) || 0),
-    spawnTimer: 0.8,
+    spawnTimer: 1.6,
     player: { x: W / 2, targetX: W / 2, bob: 0 },
     obstacles: [],
     roadOffset: 0,
@@ -170,7 +170,7 @@
     state.scroll = SCROLL_START;
     state.distance = 0;
     state.score = 0;
-    state.spawnTimer = 0.6;
+    state.spawnTimer = 1.6;
     state.player.x = W / 2;
     state.player.targetX = W / 2;
     state.player.bob = 0;
@@ -275,8 +275,13 @@
     const x = pickSpawnX(w);
     if (x === null) return;
     const o = { type, sub, x, y: -h - 40, w, h, passed: false, phase: Math.random() * Math.PI * 2 };
-    // ranged attacks — per person type
-    if (Math.random() < 0.6) {
+    // ranged attacks — 초반엔 순수 회피, 거리 쌓이면 점차 활성화
+    let throwChance = 0;
+    if (state.distance > 3000) {
+      const rt = Math.min(1, (state.distance - 3000) / 4000);
+      throwChance = 0.35 + 0.3 * rt;
+    }
+    if (throwChance > 0 && Math.random() < throwChance) {
       let kind = null;
       if (sub === "zookeeper") kind = "net";
       else if (sub === "vet") kind = "dart";
@@ -381,7 +386,7 @@
 
     // nonlinear difficulty ramp — slower start, steeper late
     const rampT = Math.min(1, state.distance / SCROLL_RAMP_DIST);
-    const accelNow = SCROLL_ACCEL * (0.45 + 1.35 * rampT * rampT);
+    const accelNow = SCROLL_ACCEL * (0.28 + 1.7 * rampT * rampT);
     state.scroll = Math.min(SCROLL_MAX, state.scroll + accelNow * dt);
     state.distance += state.scroll * dt;
     const newScore = Math.floor(state.distance / 25) + state.bonusPoints;
@@ -513,7 +518,7 @@
         const mag = Math.hypot(dx, dy) || 1;
         let speed, r;
         if (o.throws === "dart") { speed = 780; r = 14; } // 수의사 마취총 — 빠르고 작음
-        else { speed = 360; r = 30; }                     // 사육사 그물 — 느리고 큼
+        else { speed = 360; r = 45; }                     // 사육사 그물 — 느리고 큼 (1.5배)
         state.bullets.push({
           kind: o.throws,
           x: nx, y: ny,
@@ -1406,11 +1411,9 @@
     const y = o.y;
     const h = o.h;
     let uniform = "#7a6a3e", cap = "#4a5c2e", accent = "#d4c18b";
-    let label = null;
+    const label = null;
     if (o.sub === "vet") {
-      uniform = "#f0f4f6"; cap = "#d8dfe2"; accent = "#2a9a88"; label = "수의사";
-    } else {
-      label = "동물원";
+      uniform = "#f0f4f6"; cap = "#d8dfe2"; accent = "#2a9a88";
     }
     // shadow
     ctx.fillStyle = "rgba(0,0,0,0.25)";
