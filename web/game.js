@@ -2330,117 +2330,119 @@
     ctx.translate(sx, sy);
     drawBackground();
     for (const o of state.obstacles) drawObstacle(o);
+    if (state.phase === "intro") drawIntroBg();
     drawPlayer();
     if (state.phase === "boss" || state.phase === "victory") drawBoss();
     for (const bt of state.bullets) drawBullet(bt);
     drawBossAnnounce();
     drawScoreFloats();
     if (state.reveal) drawReveal();
-    if (state.phase === "intro") drawIntroCage();
+    if (state.phase === "intro") drawIntroFg();
     if (state.phase === "outro") drawOutroBanner();
     ctx.restore();
   }
 
-  function drawIntroCage() {
-    const t = state.introT;
-    const dur = INTRO_DURATION;
-    const progress = Math.min(1, t / (dur - 0.4));
-    // bars span the road in front of the wolf
-    const barTop = PLAYER_Y - 360;
-    const barBot = PLAYER_Y - 120;
-    const fullH = barBot - barTop;
-    const barCount = 5;
-    const barW = 18;
-    const span = W - 80;
-    const step = span / (barCount - 1);
-    const cutOrder = [2, 1, 3, 0, 4]; // cut from middle outward
-    for (let i = 0; i < barCount; i++) {
-      const cutPosition = cutOrder.indexOf(i) / barCount;
-      const localT = Math.max(0, Math.min(1, (progress - cutPosition) * 4));
-      const eaten = localT * fullH;
-      const x = 40 + i * step - barW / 2;
-      // unmelted bottom portion remaining
-      if (eaten < fullH) {
-        ctx.fillStyle = "#7a2218";
-        ctx.fillRect(x, barTop + eaten, barW, fullH - eaten);
-        // bar highlight
-        ctx.fillStyle = "rgba(255, 100, 60, 0.3)";
-        ctx.fillRect(x + 3, barTop + eaten, 4, fullH - eaten);
-        // glowing molten cut edge
-        if (eaten > 0) {
-          const grad = ctx.createLinearGradient(x, barTop + eaten - 18, x, barTop + eaten + 4);
-          grad.addColorStop(0, "rgba(255, 220, 80, 0)");
-          grad.addColorStop(0.5, "rgba(255, 180, 40, 0.95)");
-          grad.addColorStop(1, "rgba(255, 80, 20, 1)");
-          ctx.fillStyle = grad;
-          ctx.fillRect(x - 4, barTop + eaten - 18, barW + 8, 22);
-        }
-      }
-      // sparks falling from cut point
-      if (eaten > 0 && eaten < fullH) {
-        for (let s = 0; s < 6; s++) {
-          const sa = (t * 8 + s + i) * 1.7;
-          const sx = x + barW / 2 + Math.sin(sa) * 10;
-          const sy = barTop + eaten + ((sa * 60) % 80);
-          ctx.fillStyle = `rgba(255, ${180 - (s * 10) % 100}, 30, ${0.9 - ((sa * 60) % 80) / 80})`;
-          ctx.fillRect(sx, sy, 2, 2);
-        }
+  function drawIntroBg() {
+    // 동물원 사육장 — dirt floor + grass patches + perimeter fence (covers default road BG)
+    ctx.fillStyle = "#7a5b3a";
+    ctx.fillRect(0, 0, W, H);
+    // grass patches
+    ctx.fillStyle = "#5a7a3a";
+    for (let gy = 80; gy < H; gy += 110) {
+      for (let gx = 40 + ((gy * 31) % 60); gx < W; gx += 130) {
+        ctx.beginPath();
+        ctx.ellipse(gx, gy, 22, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
-    // active torch flame: positioned at currently-cutting bar
-    const activeIdx = cutOrder[Math.min(barCount - 1, Math.floor(progress * barCount))];
-    const flameX = 40 + activeIdx * step;
-    const cuttingTop = barTop + Math.min(fullH, Math.max(0, (progress * barCount - cutOrder.indexOf(activeIdx)) * fullH));
-    drawTorchFlame(flameX, cuttingTop, t);
-    // hint text
-    if (t < dur - 0.4) {
-      ctx.fillStyle = `rgba(255, 220, 80, ${0.8 + Math.sin(t * 8) * 0.2})`;
-      ctx.font = "bold 28px 'Apple SD Gothic Neo', sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("산소절단기 가동 중…", W / 2, 120);
-    } else {
-      // burst flash near end
-      const f = (t - (dur - 0.4)) / 0.4;
-      ctx.fillStyle = `rgba(255, 200, 40, ${(1 - f) * 0.6})`;
-      ctx.fillRect(0, 0, W, H);
+    // rocks
+    ctx.fillStyle = "#8a7a5a";
+    for (let i = 0; i < 12; i++) {
+      const rx = ((i * 167) % W);
+      const ry = ((i * 271) % H);
+      ctx.beginPath();
+      ctx.arc(rx, ry, 4 + (i % 3), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // perimeter fence at top (between the wolf and outside)
+    ctx.fillStyle = "#5a4a3a";
+    ctx.fillRect(0, 60, W, 12);
+    ctx.fillStyle = "#3a2a1a";
+    for (let fx = 0; fx < W; fx += 22) {
+      ctx.fillRect(fx, 72, 4, 160);
+    }
+    // hole + dirt mound BEHIND/AROUND the wolf — drawn before player so player sits in front
+    const t = state.introT;
+    const digT = Math.min(1, t / 1.8);
+    const holeX = state.player.x;
+    const holeY = PLAYER_Y + 28;
+    const holeR = 76 * digT;
+    if (holeR > 4) {
+      ctx.fillStyle = "#1a0e08";
+      ctx.beginPath();
+      ctx.ellipse(holeX, holeY, holeR, holeR * 0.55, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // dirt mound rim (top half, looks like piled dirt around the hole)
+      ctx.fillStyle = "#5a4028";
+      ctx.beginPath();
+      ctx.ellipse(holeX - holeR * 0.7, holeY - 6, holeR * 0.5, holeR * 0.28, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(holeX + holeR * 0.7, holeY - 6, holeR * 0.5, holeR * 0.28, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#8a6a3a";
+      ctx.beginPath();
+      ctx.ellipse(holeX - holeR * 0.7, holeY - 12, holeR * 0.45, holeR * 0.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(holeX + holeR * 0.7, holeY - 12, holeR * 0.45, holeR * 0.2, 0, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 
-  function drawTorchFlame(x, y, t) {
-    // small handheld torch nozzle pointing up at the bar
-    ctx.save();
-    ctx.translate(x, y + 20);
-    // nozzle body
-    ctx.fillStyle = "#3a3a3a";
-    ctx.fillRect(-6, 4, 12, 26);
-    ctx.fillStyle = "#8a8a8a";
-    ctx.fillRect(-6, 4, 12, 4);
-    // outer flame (orange)
-    const flicker = Math.sin(t * 30) * 2;
-    ctx.fillStyle = "rgba(255, 130, 30, 0.85)";
-    ctx.beginPath();
-    ctx.moveTo(-10, 4);
-    ctx.quadraticCurveTo(-6 + flicker, -12, 0, -22);
-    ctx.quadraticCurveTo(6 - flicker, -12, 10, 4);
-    ctx.closePath();
-    ctx.fill();
-    // inner flame (yellow)
-    ctx.fillStyle = "rgba(255, 220, 80, 0.95)";
-    ctx.beginPath();
-    ctx.moveTo(-6, 4);
-    ctx.quadraticCurveTo(-2, -8, 0, -16);
-    ctx.quadraticCurveTo(2, -8, 6, 4);
-    ctx.closePath();
-    ctx.fill();
-    // hot blue core (oxy-acetylene tell-tale)
-    ctx.fillStyle = "rgba(140, 200, 255, 0.9)";
-    ctx.beginPath();
-    ctx.moveTo(-3, 4);
-    ctx.quadraticCurveTo(-1, -2, 0, -8);
-    ctx.quadraticCurveTo(1, -2, 3, 4);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
+  function drawIntroFg() {
+    const t = state.introT;
+    const dur = INTRO_DURATION;
+    const holeX = state.player.x;
+    // dirt particle spray while digging (sprays sideways from the wolf)
+    if (t < 1.8) {
+      ctx.fillStyle = "#6a4a28";
+      for (let i = 0; i < 12; i++) {
+        const sa = (t * 10 + i * 0.7);
+        const side = i % 2 === 0 ? -1 : 1;
+        const ang = side * (0.3 + (sa % 1.0) * 0.8);
+        const dist = 30 + ((sa * 70) % 70);
+        const dx = holeX + Math.cos(ang) * dist * side;
+        const dy = PLAYER_Y - 30 - Math.sin(Math.abs(ang)) * dist;
+        ctx.fillRect(dx, dy, 3, 3);
+      }
+    }
+    // hint text
+    if (t < 2.2) {
+      ctx.fillStyle = `rgba(255, 220, 80, ${0.8 + Math.sin(t * 8) * 0.2})`;
+      ctx.font = "bold 28px 'Apple SD Gothic Neo', sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("땅굴을 파는 중…", W / 2, 130);
+    }
+    // dirt cloud wipe (envelops everything) for the transition out
+    if (t > 2.2) {
+      const cloudT = Math.min(1, (t - 2.2) / 0.5);   // 2.2→2.7 expand
+      const fadeT = Math.max(0, Math.min(1, (t - 2.7) / 0.5)); // 2.7→3.2 fade
+      const alpha = (cloudT - fadeT * 0.7);
+      if (alpha > 0) {
+        ctx.fillStyle = `rgba(122, 91, 58, ${alpha})`;
+        ctx.fillRect(0, 0, W, H);
+        // billowing puff edges
+        ctx.fillStyle = `rgba(160, 120, 80, ${alpha * 0.7})`;
+        for (let i = 0; i < 24; i++) {
+          const a = (i / 24) * Math.PI * 2;
+          const r = 200 + Math.sin(t * 6 + i) * 30;
+          ctx.beginPath();
+          ctx.arc(W / 2 + Math.cos(a) * r * cloudT, PLAYER_Y + Math.sin(a) * r * cloudT * 0.7, 60 * cloudT, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
   }
 
   function drawOutroBanner() {
