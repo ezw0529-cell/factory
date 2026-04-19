@@ -216,7 +216,15 @@
       type = 3; w = 120; h = 150;
     }
     const x = PLAYER_MARGIN + Math.random() * (W - PLAYER_MARGIN * 2 - w);
-    state.obstacles.push({ type, sub, x, y: -h - 40, w, h, passed: false, phase: Math.random() * Math.PI * 2 });
+    const o = { type, sub, x, y: -h - 40, w, h, passed: false, phase: Math.random() * Math.PI * 2 };
+    // net-throwing: zookeepers/police have ~55% chance to throw a net at the player
+    if (type === 0 && (sub === "zookeeper" || sub === "police") && Math.random() < 0.55) {
+      o.throws = true;
+      o.thrown = false;
+      // throw when mid-screen (y reaches this threshold)
+      o.throwAtY = 180 + Math.random() * 180;
+    }
+    state.obstacles.push(o);
   }
 
   function spawnTanker() {
@@ -334,8 +342,30 @@
     }
     // during approach/boss, no obstacles spawn — tankers are background only
 
-    // move obstacles
-    for (const o of state.obstacles) o.y += state.scroll * dt;
+    // move obstacles + keeper net throws
+    for (const o of state.obstacles) {
+      o.y += state.scroll * dt;
+      if (o.throws && !o.thrown && o.y >= o.throwAtY) {
+        o.thrown = true;
+        // net aims for player's current x, lobbing downward
+        const nx = o.x + o.w / 2;
+        const ny = o.y + o.h * 0.4;
+        const tx = p.x;
+        const ty = PLAYER_Y;
+        const dx = tx - nx;
+        const dy = Math.max(40, ty - ny);
+        const mag = Math.hypot(dx, dy) || 1;
+        const speed = 380;
+        state.bullets.push({
+          kind: "net",
+          x: nx, y: ny,
+          vx: dx / mag * speed,
+          vy: dy / mag * speed,
+          r: 30,
+          spin: 0,
+        });
+      }
+    }
     state.obstacles = state.obstacles.filter((o) => o.y < H + 60);
 
     // boss: slow descent through center, fire while high, then drop
@@ -912,7 +942,7 @@
   }
 
   function drawCustomer(cx, py, w, h, pal, idx) {
-    const bob = Math.sin((idx * 0.9) + state.roadOffset * 0.01) * 1.5;
+    const bob = Math.sin((idx * 0.9) + performance.now() / 500) * 1.5;
     const x = cx - w / 2;
     const y = py + bob;
     // shadow
@@ -1380,6 +1410,10 @@
   }
 
   function drawBullet(bt) {
+    if (bt.kind === "net") {
+      drawNet(bt);
+      return;
+    }
     ctx.save();
     ctx.translate(bt.x, bt.y);
     ctx.rotate(bt.spin);
@@ -1406,6 +1440,35 @@
     ctx.textBaseline = "middle";
     ctx.fillText("$", bt.x, bt.y);
     ctx.textBaseline = "alphabetic";
+  }
+
+  function drawNet(bt) {
+    const cx = bt.x, cy = bt.y, r = bt.r;
+    // rope rim
+    ctx.strokeStyle = "#5a3a20"; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+    // net mesh — crosshatch clipped to circle
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, r - 1, 0, Math.PI * 2); ctx.clip();
+    ctx.strokeStyle = "rgba(40, 25, 10, 0.75)"; ctx.lineWidth = 1.5;
+    const step = 8;
+    ctx.rotate; // noop
+    for (let i = -r; i <= r; i += step) {
+      ctx.beginPath();
+      ctx.moveTo(cx - r, cy + i);
+      ctx.lineTo(cx + r, cy + i);
+      ctx.stroke();
+    }
+    for (let i = -r; i <= r; i += step) {
+      ctx.beginPath();
+      ctx.moveTo(cx + i, cy - r);
+      ctx.lineTo(cx + i, cy + r);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // rim highlight
+    ctx.strokeStyle = "#8a6a3a"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI * 0.7, -Math.PI * 0.2); ctx.stroke();
   }
 
   function drawObstacle(o) {
@@ -1720,31 +1783,48 @@
     ctx.beginPath();
     ctx.ellipse(cx, y + b.h * 0.5, 80, 40, 0, 0, Math.PI * 2);
     ctx.fill();
-    // signature combover — single unified golden-blonde tone
-    const hairBase = "#e6b858";
+    // signature combover — iconic swept-back pompadour with forward flop
+    const hairBase = "#e8b95a";
+    // back/side volume (widest, slightly darker — sits behind everything)
+    ctx.fillStyle = "#cc9838";
+    ctx.beginPath();
+    ctx.moveTo(cx - 100, y + b.h * 0.38);
+    ctx.quadraticCurveTo(cx - 118, y + 2, cx - 60, y - 18);
+    ctx.quadraticCurveTo(cx + 20, y - 26, cx + 100, y + 2);
+    ctx.quadraticCurveTo(cx + 122, y + b.h * 0.18, cx + 108, y + b.h * 0.34);
+    ctx.quadraticCurveTo(cx, y + b.h * 0.26, cx - 100, y + b.h * 0.38);
+    ctx.fill();
+    // main golden volume — pompadour swept right, higher crown on the left
     ctx.fillStyle = hairBase;
-    // main volume: swept-back pompadour, higher on left, trailing right
     ctx.beginPath();
-    ctx.moveTo(cx - 96, y + b.h * 0.36);
-    ctx.quadraticCurveTo(cx - 110, y - 10, cx - 40, y - 26);
-    ctx.quadraticCurveTo(cx + 40, y - 34, cx + 96, y - 6);
-    ctx.quadraticCurveTo(cx + 126, y + b.h * 0.14, cx + 110, y + b.h * 0.3);
-    ctx.quadraticCurveTo(cx + 80, y + b.h * 0.22, cx + 40, y + b.h * 0.24);
-    ctx.quadraticCurveTo(cx - 30, y + b.h * 0.22, cx - 96, y + b.h * 0.36);
+    ctx.moveTo(cx - 92, y + b.h * 0.34);
+    ctx.quadraticCurveTo(cx - 106, y - 14, cx - 34, y - 30);
+    ctx.quadraticCurveTo(cx + 46, y - 30, cx + 88, y - 4);
+    ctx.quadraticCurveTo(cx + 110, y + b.h * 0.12, cx + 92, y + b.h * 0.26);
+    ctx.quadraticCurveTo(cx + 40, y + b.h * 0.2, cx - 20, y + b.h * 0.2);
+    ctx.quadraticCurveTo(cx - 70, y + b.h * 0.22, cx - 92, y + b.h * 0.34);
     ctx.fill();
-    // front wave flop — the iconic forehead sweep
+    // forward flop bang — the iconic forehead wave, curving down to the right
     ctx.beginPath();
-    ctx.moveTo(cx - 80, y + b.h * 0.32);
-    ctx.quadraticCurveTo(cx - 40, y + b.h * 0.12, cx + 20, y + b.h * 0.18);
-    ctx.quadraticCurveTo(cx + 70, y + b.h * 0.22, cx + 96, y + b.h * 0.34);
-    ctx.quadraticCurveTo(cx + 30, y + b.h * 0.3, cx - 80, y + b.h * 0.32);
+    ctx.moveTo(cx - 80, y + b.h * 0.3);
+    ctx.quadraticCurveTo(cx - 30, y + b.h * 0.08, cx + 40, y + b.h * 0.14);
+    ctx.quadraticCurveTo(cx + 86, y + b.h * 0.22, cx + 94, y + b.h * 0.32);
+    ctx.quadraticCurveTo(cx + 70, y + b.h * 0.3, cx + 30, y + b.h * 0.26);
+    ctx.quadraticCurveTo(cx - 30, y + b.h * 0.24, cx - 80, y + b.h * 0.3);
     ctx.fill();
-    // subtle base shadow — darker tone at hairline for depth (no diagonal strands)
-    ctx.fillStyle = "rgba(160, 110, 30, 0.22)";
+    // top highlight — subtle lift catches light on the crown
+    ctx.fillStyle = "#f6d080";
     ctx.beginPath();
-    ctx.moveTo(cx - 90, y + b.h * 0.34);
-    ctx.quadraticCurveTo(cx, y + b.h * 0.26, cx + 100, y + b.h * 0.32);
-    ctx.quadraticCurveTo(cx, y + b.h * 0.3, cx - 90, y + b.h * 0.34);
+    ctx.moveTo(cx - 40, y + b.h * 0.04);
+    ctx.quadraticCurveTo(cx + 10, y - 18, cx + 60, y + b.h * 0.02);
+    ctx.quadraticCurveTo(cx + 20, y + b.h * 0.1, cx - 40, y + b.h * 0.04);
+    ctx.fill();
+    // hairline shadow below the bang — grounds the bang on the forehead
+    ctx.fillStyle = "rgba(120, 80, 20, 0.28)";
+    ctx.beginPath();
+    ctx.moveTo(cx - 74, y + b.h * 0.32);
+    ctx.quadraticCurveTo(cx, y + b.h * 0.28, cx + 90, y + b.h * 0.32);
+    ctx.quadraticCurveTo(cx, y + b.h * 0.31, cx - 74, y + b.h * 0.32);
     ctx.fill();
     // squint eyes
     ctx.strokeStyle = "#111";
