@@ -1405,44 +1405,6 @@
     ctx.rotate(-0.12);
     ctx.fillText("탈출!", 0, 0);
     ctx.restore();
-
-    // dug tunnel + dirt mound near the right pillar — escape by digging
-    const tx = x + W * 0.72;
-    const ty = y + h - 18;
-    // dirt mound (piled to the side)
-    ctx.fillStyle = "#5a3a20";
-    ctx.beginPath();
-    ctx.moveTo(tx + 30, ty + 4);
-    ctx.quadraticCurveTo(tx + 60, ty - 22, tx + 90, ty + 4);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "#7a4a28";
-    ctx.beginPath();
-    ctx.moveTo(tx + 42, ty + 4);
-    ctx.quadraticCurveTo(tx + 60, ty - 14, tx + 78, ty + 4);
-    ctx.closePath();
-    ctx.fill();
-    // little dirt specks
-    ctx.fillStyle = "#3a2414";
-    ctx.fillRect(tx + 24, ty + 2, 4, 3);
-    ctx.fillRect(tx + 96, ty + 2, 3, 3);
-    ctx.fillRect(tx + 54, ty - 18, 3, 3);
-    // tunnel mouth under the fence
-    ctx.fillStyle = "#0a0a0a";
-    ctx.beginPath();
-    ctx.ellipse(tx, ty, 22, 10, 0, Math.PI, Math.PI * 2);
-    ctx.lineTo(tx + 22, ty + 4);
-    ctx.lineTo(tx - 22, ty + 4);
-    ctx.closePath();
-    ctx.fill();
-    // paw prints leading from the tunnel
-    ctx.fillStyle = "#3a2414";
-    for (let i = 0; i < 3; i++) {
-      const pxp = tx - 26 - i * 24;
-      const pyp = ty + 8 + i * 4;
-      ctx.beginPath(); ctx.arc(pxp, pyp, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(pxp - 6, pyp + 4, 3, 0, Math.PI * 2); ctx.fill();
-    }
   }
 
   function drawScenery(s) {
