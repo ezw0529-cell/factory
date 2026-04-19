@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>OG Image Generator — 늑구런</title>
+<style>
+  body { background: #111; color: #eee; font-family: system-ui, sans-serif; margin: 0; padding: 20px; text-align: center; }
+  canvas { max-width: 100%; border: 1px solid #333; box-shadow: 0 4px 20px rgba(0,0,0,0.5); display: block; margin: 16px auto; }
+  button { font-size: 16px; padding: 10px 20px; background: #ffd84a; color: #000; border: 0; border-radius: 8px; cursor: pointer; font-weight: 700; }
+  p { color: #aaa; font-size: 14px; }
+</style>
+</head>
+<body>
+<h2>늑구런 OG 이미지 (1200×630)</h2>
+<canvas id="c" width="1200" height="630"></canvas>
+<p>아래 버튼으로 PNG 저장 → <code>web/og-image.png</code>에 넣어주세요.</p>
+<button id="dl">PNG 다운로드</button>
+
+<script>
+const c = document.getElementById("c");
+const ctx = c.getContext("2d");
+const W = 1200, H = 630;
+
+// background — sky gradient to grass
+const bg = ctx.createLinearGradient(0, 0, 0, H);
+bg.addColorStop(0, "#8ac4e7");
+bg.addColorStop(0.7, "#cfe4f1");
+bg.addColorStop(0.7, "#6b8f53");
+bg.addColorStop(1, "#5a7b45");
+ctx.fillStyle = bg;
+ctx.fillRect(0, 0, W, H);
+
+// asphalt road strip across middle
+ctx.fillStyle = "#3a3a3a";
+ctx.fillRect(0, 360, W, 180);
+ctx.fillStyle = "#ffd84a";
+for (let x = 30; x < W; x += 80) {
+  ctx.fillRect(x, 445, 40, 6);
+}
+// sidewalks
+ctx.fillStyle = "#c0b8a8";
+ctx.fillRect(0, 350, W, 10);
+ctx.fillRect(0, 540, W, 10);
+
+// cage bars silhouette on left (zoo escape vibe)
+ctx.fillStyle = "rgba(138, 42, 34, 0.6)";
+for (let i = 0; i < 5; i++) {
+  ctx.fillRect(i * 26 + 10, 0, 8, 330);
+}
+
+// big title
+ctx.fillStyle = "#ffd84a";
+ctx.font = "bold 160px 'Apple SD Gothic Neo', system-ui, sans-serif";
+ctx.textAlign = "center";
+ctx.shadowColor = "rgba(0,0,0,0.7)";
+ctx.shadowBlur = 10;
+ctx.shadowOffsetY = 6;
+ctx.fillText("늑구런", 650, 230);
+ctx.shadowBlur = 0;
+ctx.shadowOffsetY = 0;
+
+// subtitle
+ctx.fillStyle = "#ffffff";
+ctx.font = "bold 36px 'Apple SD Gothic Neo', system-ui, sans-serif";
+ctx.shadowColor = "rgba(0,0,0,0.6)";
+ctx.shadowBlur = 4;
+ctx.shadowOffsetY = 3;
+ctx.fillText("대전 동물원 탈출 10일간의 질주", 650, 290);
+
+// tag line
+ctx.fillStyle = "#cde";
+ctx.font = "500 26px 'Apple SD Gothic Neo', system-ui, sans-serif";
+ctx.fillText("—  엔들리스 러너  ·  픽션  —", 650, 330);
+ctx.shadowBlur = 0;
+ctx.shadowOffsetY = 0;
+
+// draw 늑구 — helicopter top-down wolf in center of road
+function drawWolf(cx, cy, scale) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(scale, scale);
+
+  // shadow
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
+  ctx.beginPath();
+  ctx.ellipse(0, 90, 85, 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // tail
+  ctx.fillStyle = "#8a7050";
+  ctx.beginPath();
+  ctx.ellipse(0, 95, 18, 45, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#f5e8c8";
+  ctx.beginPath();
+  ctx.ellipse(0, 128, 10, 16, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // back legs
+  ctx.fillStyle = "#c0a982";
+  ctx.beginPath(); ctx.ellipse(-55, 55, 20, 30, 0.2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(55, 55, 20, 30, -0.2, 0, Math.PI * 2); ctx.fill();
+
+  // body (cream with darker saddle)
+  ctx.fillStyle = "#b8a07a";
+  ctx.beginPath();
+  ctx.ellipse(0, 20, 75, 80, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // darker saddle down the spine (radial gradient)
+  const saddle = ctx.createRadialGradient(0, 10, 5, 0, 10, 50);
+  saddle.addColorStop(0, "#6a5438");
+  saddle.addColorStop(1, "rgba(106, 84, 56, 0)");
+  ctx.fillStyle = saddle;
+  ctx.beginPath();
+  ctx.ellipse(0, 10, 40, 60, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // front legs
+  ctx.fillStyle = "#c0a982";
+  ctx.beginPath(); ctx.ellipse(-50, -50, 18, 28, -0.2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(50, -50, 18, 28, 0.2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#2a2218";
+  ctx.beginPath(); ctx.arc(-50, -68, 12, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(50, -68, 12, 0, Math.PI * 2); ctx.fill();
+
+  // head (tan) — top-down oval
+  ctx.fillStyle = "#c9b089";
+  ctx.beginPath();
+  ctx.ellipse(0, -70, 45, 55, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ears (pointing up/outward)
+  ctx.fillStyle = "#7a6548";
+  ctx.beginPath();
+  ctx.moveTo(-30, -105); ctx.lineTo(-50, -135); ctx.lineTo(-20, -110); ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(30, -105); ctx.lineTo(50, -135); ctx.lineTo(20, -110); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#d69a7a";
+  ctx.beginPath();
+  ctx.moveTo(-28, -108); ctx.lineTo(-42, -125); ctx.lineTo(-22, -112); ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(28, -108); ctx.lineTo(42, -125); ctx.lineTo(22, -112); ctx.closePath(); ctx.fill();
+
+  // muzzle (lighter, forward)
+  ctx.fillStyle = "#ede1c2";
+  ctx.beginPath();
+  ctx.ellipse(0, -95, 14, 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // nose
+  ctx.fillStyle = "#121212";
+  ctx.beginPath();
+  ctx.ellipse(0, -108, 5, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+drawWolf(650, 480, 0.9);
+
+// small footer URL
+ctx.fillStyle = "rgba(255,255,255,0.85)";
+ctx.font = "600 20px ui-monospace, Menlo, monospace";
+ctx.textAlign = "right";
+ctx.fillText("neukgu-run  ·  v1.1.0", W - 24, H - 18);
+
+// download
+document.getElementById("dl").addEventListener("click", () => {
+  c.toBlob(blob => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "og-image.png";
+    a.click();
+  }, "image/png");
+});
+</script>
+</body>
+</html>
