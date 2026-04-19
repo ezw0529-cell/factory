@@ -34,6 +34,7 @@
   const creditsScroll = document.getElementById("credits-scroll");
 
   const BOSS_SCORE = 560;
+  const INTRO_DURATION = 3.2;
 
   const state = {
     running: false,
@@ -53,8 +54,11 @@
     pointerActive: false,
     keyLeft: false,
     keyRight: false,
-    phase: "normal", // "normal" | "approach" | "boss" | "victory"
+    phase: "normal", // "intro" | "normal" | "approach" | "boss" | "victory" | "outro"
     phaseT: 0,
+    introT: 0,
+    outroT: 0,
+    playerYOffset: 0,
     boss: null,
     bossAnnounce: 0,
     bullets: [],
@@ -159,8 +163,11 @@
     state.shake = 0;
     state.clouds = seedClouds();
     state.scenery = seedScenery();
-    state.phase = "normal";
+    state.phase = "intro";
     state.phaseT = 0;
+    state.introT = 0;
+    state.outroT = 0;
+    state.playerYOffset = 0;
     state.boss = null;
     state.bossAnnounce = 0;
     state.bullets = [];
@@ -312,6 +319,32 @@
       if (state.reveal.t >= 0.9) {
         state.reveal = null;
         gameOver("male");
+      }
+      return;
+    }
+
+    // intro: torch-cutting cage bars sequence — player can't move, no spawning
+    if (state.phase === "intro") {
+      state.introT += dt;
+      // gentle scroll showing the gate area
+      state.scroll = 80;
+      state.roadOffset = (state.roadOffset + state.scroll * dt) % 160;
+      if (state.introT >= INTRO_DURATION) {
+        state.phase = "normal";
+        state.scroll = SCROLL_START;
+      }
+      return;
+    }
+
+    // outro: 늑구 sails through the strait then triggers credits
+    if (state.phase === "outro") {
+      state.outroT += dt;
+      state.playerYOffset -= 240 * dt;
+      // keep the strait scrolling underneath
+      state.roadOffset = (state.roadOffset + 280 * dt) % 160;
+      if (state.outroT >= 2.6) {
+        victory();
+        return;
       }
       return;
     }
@@ -503,9 +536,11 @@
         }
         // once death animation is done, just call it a win
         if (b.deadT > 0.85) {
-          state.phase = "victory";
+          state.phase = "outro";
+          state.outroT = 0;
           state.boss = null;
-          victory();
+          state.bullets = [];
+          state.obstacles = [];
           return;
         }
       }
@@ -578,7 +613,7 @@
   }
 
   function drawBackground() {
-    const isBossBg = state.phase === "approach" || state.phase === "boss" || state.phase === "victory";
+    const isBossBg = state.phase === "approach" || state.phase === "boss" || state.phase === "victory" || state.phase === "outro";
 
     if (isBossBg) {
       // sunset sky
@@ -743,7 +778,8 @@
     const p = state.player;
     const bob = Math.sin(p.bob * 14) * 2;
     const cx = p.x;
-    const cy = PLAYER_Y + bob;
+    const cy = PLAYER_Y + bob + (state.playerYOffset || 0);
+    if (cy < -120) return;
 
     const FUR = "#c4aa80";
     const FUR_MID = "#967d57";
@@ -2300,7 +2336,125 @@
     drawBossAnnounce();
     drawScoreFloats();
     if (state.reveal) drawReveal();
+    if (state.phase === "intro") drawIntroCage();
+    if (state.phase === "outro") drawOutroBanner();
     ctx.restore();
+  }
+
+  function drawIntroCage() {
+    const t = state.introT;
+    const dur = INTRO_DURATION;
+    const progress = Math.min(1, t / (dur - 0.4));
+    // bars span the road in front of the wolf
+    const barTop = PLAYER_Y - 360;
+    const barBot = PLAYER_Y - 120;
+    const fullH = barBot - barTop;
+    const barCount = 5;
+    const barW = 18;
+    const span = W - 80;
+    const step = span / (barCount - 1);
+    const cutOrder = [2, 1, 3, 0, 4]; // cut from middle outward
+    for (let i = 0; i < barCount; i++) {
+      const cutPosition = cutOrder.indexOf(i) / barCount;
+      const localT = Math.max(0, Math.min(1, (progress - cutPosition) * 4));
+      const eaten = localT * fullH;
+      const x = 40 + i * step - barW / 2;
+      // unmelted bottom portion remaining
+      if (eaten < fullH) {
+        ctx.fillStyle = "#7a2218";
+        ctx.fillRect(x, barTop + eaten, barW, fullH - eaten);
+        // bar highlight
+        ctx.fillStyle = "rgba(255, 100, 60, 0.3)";
+        ctx.fillRect(x + 3, barTop + eaten, 4, fullH - eaten);
+        // glowing molten cut edge
+        if (eaten > 0) {
+          const grad = ctx.createLinearGradient(x, barTop + eaten - 18, x, barTop + eaten + 4);
+          grad.addColorStop(0, "rgba(255, 220, 80, 0)");
+          grad.addColorStop(0.5, "rgba(255, 180, 40, 0.95)");
+          grad.addColorStop(1, "rgba(255, 80, 20, 1)");
+          ctx.fillStyle = grad;
+          ctx.fillRect(x - 4, barTop + eaten - 18, barW + 8, 22);
+        }
+      }
+      // sparks falling from cut point
+      if (eaten > 0 && eaten < fullH) {
+        for (let s = 0; s < 6; s++) {
+          const sa = (t * 8 + s + i) * 1.7;
+          const sx = x + barW / 2 + Math.sin(sa) * 10;
+          const sy = barTop + eaten + ((sa * 60) % 80);
+          ctx.fillStyle = `rgba(255, ${180 - (s * 10) % 100}, 30, ${0.9 - ((sa * 60) % 80) / 80})`;
+          ctx.fillRect(sx, sy, 2, 2);
+        }
+      }
+    }
+    // active torch flame: positioned at currently-cutting bar
+    const activeIdx = cutOrder[Math.min(barCount - 1, Math.floor(progress * barCount))];
+    const flameX = 40 + activeIdx * step;
+    const cuttingTop = barTop + Math.min(fullH, Math.max(0, (progress * barCount - cutOrder.indexOf(activeIdx)) * fullH));
+    drawTorchFlame(flameX, cuttingTop, t);
+    // hint text
+    if (t < dur - 0.4) {
+      ctx.fillStyle = `rgba(255, 220, 80, ${0.8 + Math.sin(t * 8) * 0.2})`;
+      ctx.font = "bold 28px 'Apple SD Gothic Neo', sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("산소절단기 가동 중…", W / 2, 120);
+    } else {
+      // burst flash near end
+      const f = (t - (dur - 0.4)) / 0.4;
+      ctx.fillStyle = `rgba(255, 200, 40, ${(1 - f) * 0.6})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  function drawTorchFlame(x, y, t) {
+    // small handheld torch nozzle pointing up at the bar
+    ctx.save();
+    ctx.translate(x, y + 20);
+    // nozzle body
+    ctx.fillStyle = "#3a3a3a";
+    ctx.fillRect(-6, 4, 12, 26);
+    ctx.fillStyle = "#8a8a8a";
+    ctx.fillRect(-6, 4, 12, 4);
+    // outer flame (orange)
+    const flicker = Math.sin(t * 30) * 2;
+    ctx.fillStyle = "rgba(255, 130, 30, 0.85)";
+    ctx.beginPath();
+    ctx.moveTo(-10, 4);
+    ctx.quadraticCurveTo(-6 + flicker, -12, 0, -22);
+    ctx.quadraticCurveTo(6 - flicker, -12, 10, 4);
+    ctx.closePath();
+    ctx.fill();
+    // inner flame (yellow)
+    ctx.fillStyle = "rgba(255, 220, 80, 0.95)";
+    ctx.beginPath();
+    ctx.moveTo(-6, 4);
+    ctx.quadraticCurveTo(-2, -8, 0, -16);
+    ctx.quadraticCurveTo(2, -8, 6, 4);
+    ctx.closePath();
+    ctx.fill();
+    // hot blue core (oxy-acetylene tell-tale)
+    ctx.fillStyle = "rgba(140, 200, 255, 0.9)";
+    ctx.beginPath();
+    ctx.moveTo(-3, 4);
+    ctx.quadraticCurveTo(-1, -2, 0, -8);
+    ctx.quadraticCurveTo(1, -2, 3, 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawOutroBanner() {
+    const t = state.outroT;
+    const alpha = Math.min(1, t * 2) * Math.min(1, (2.6 - t) * 3);
+    ctx.fillStyle = `rgba(0, 0, 0, ${0.4 * alpha})`;
+    ctx.fillRect(0, H * 0.18, W, 130);
+    ctx.textAlign = "center";
+    ctx.fillStyle = `rgba(255, 220, 80, ${alpha})`;
+    ctx.font = "bold 56px 'Apple SD Gothic Neo', sans-serif";
+    ctx.fillText("호르무즈 돌파!", W / 2, H * 0.26);
+    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+    ctx.font = "bold 26px sans-serif";
+    ctx.fillText("끝없는 바다 너머로…", W / 2, H * 0.31);
   }
 
   function drawReveal() {
