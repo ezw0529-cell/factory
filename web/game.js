@@ -98,9 +98,9 @@
     const side = Math.random() < 0.5 ? "L" : "R";
     const roll = Math.random();
     let kind, w, h;
-    if (roll < 0.18) {
+    if (roll < 0.06) {
       kind = "sign"; w = 90; h = 100;
-    } else if (roll < 0.8) {
+    } else if (roll < 0.78) {
       kind = "building"; w = 110; h = 100 + Math.random() * 60;
     } else {
       kind = "tree"; w = 60; h = 60;
@@ -142,7 +142,21 @@
     const w = 340;
     const h = 500;
     const x = side === "L" ? -140 : W - w + 140;  // partially off-screen
-    state.scenery.push({ kind: "stadium_big", x, y: -h - 40, w, h, side });
+    const y = -h - 40;
+    state.scenery.push({ kind: "stadium_big", x, y, w, h, side });
+    // 3 hotdog bonuses on the road right next to the stadium (stacked vertically)
+    const bw = 80, bh = 80;
+    const bx = side === "L" ? x + w + 30 : x - bw - 30;
+    const bxClamped = Math.max(PLAYER_MARGIN, Math.min(W - PLAYER_MARGIN - bw, bx));
+    for (let i = 0; i < 3; i++) {
+      state.obstacles.push({
+        type: 5, sub: "hotdog",
+        x: bxClamped,
+        y: y + 120 + i * 140,
+        w: bw, h: bh,
+        passed: false, phase: Math.random() * Math.PI * 2,
+      });
+    }
   }
 
   function seedScenery() {
@@ -219,11 +233,7 @@
       overSubEl.classList.remove("hidden");
     } else if (reason === "dart") {
       overTitleEl.textContent = "마취탄 명중";
-      overSubEl.textContent = "경찰의 정조준을 피하지 못했다.";
-      overSubEl.classList.remove("hidden");
-    } else if (reason === "water") {
-      overTitleEl.textContent = "물대포에 휩쓸렸다!";
-      overSubEl.textContent = "소방관이 진압했다.";
+      overSubEl.textContent = "수의사의 정조준을 피하지 못했다.";
       overSubEl.classList.remove("hidden");
     } else {
       overTitleEl.textContent = "잡혔다!";
@@ -249,25 +259,20 @@
   }
 
   // --- spawning ---
-  // obstacles: 0 = person (zookeeper/police/rescue), 1 = fence, 2 = barrel, 3 = "female" wolf (twist)
-  const PERSON_KINDS = ["zookeeper", "police", "rescue"];
+  // obstacles: 0 = person (zookeeper/vet), 3 = "female" wolf (twist), 4 = tanker, 5 = bonus, 6 = gorani
+  const PERSON_KINDS = ["zookeeper", "vet"];
   function spawnObstacle() {
-    const kind = Math.random();
-    let type, w, h, sub = null;
-    if (kind < 0.65) {
-      type = 0; w = 110; h = 150;
-      sub = PERSON_KINDS[Math.floor(Math.random() * PERSON_KINDS.length)];
-    } else {
-      type = 1; w = 220 + Math.random() * 160; h = 70;
-    }
-    const x = PLAYER_MARGIN + Math.random() * (W - PLAYER_MARGIN * 2 - w);
+    const type = 0;
+    const w = 110, h = 150;
+    const sub = PERSON_KINDS[Math.floor(Math.random() * PERSON_KINDS.length)];
+    const x = pickSpawnX(w);
+    if (x === null) return;
     const o = { type, sub, x, y: -h - 40, w, h, passed: false, phase: Math.random() * Math.PI * 2 };
-    // ranged attacks — different projectile per person type
-    if (type === 0 && Math.random() < 0.6) {
+    // ranged attacks — per person type
+    if (Math.random() < 0.6) {
       let kind = null;
       if (sub === "zookeeper") kind = "net";
-      else if (sub === "police") kind = "dart";
-      else if (sub === "rescue") kind = "water";
+      else if (sub === "vet") kind = "dart";
       if (kind) {
         o.throws = kind;
         o.thrown = false;
@@ -275,6 +280,24 @@
       }
     }
     state.obstacles.push(o);
+  }
+
+  // avoid horizontal overlap with obstacles near the top (recently spawned)
+  function pickSpawnX(w) {
+    const minX = PLAYER_MARGIN;
+    const maxX = W - PLAYER_MARGIN - w;
+    for (let tries = 0; tries < 6; tries++) {
+      const x = minX + Math.random() * (maxX - minX);
+      let clash = false;
+      for (const o of state.obstacles) {
+        if (o.y > 240) continue;
+        const nx = x - 20, nx2 = x + w + 20;
+        const ox = o.x, ox2 = o.x + o.w;
+        if (nx < ox2 && nx2 > ox) { clash = true; break; }
+      }
+      if (!clash) return x;
+    }
+    return null;
   }
 
   function spawnFemaleWolf() {
@@ -479,9 +502,8 @@
         const dy = Math.max(40, ty - ny);
         const mag = Math.hypot(dx, dy) || 1;
         let speed, r;
-        if (o.throws === "dart") { speed = 780; r = 14; }       // 경찰 마취총 — 빠르고 작음
-        else if (o.throws === "water") { speed = 520; r = 28; } // 소방관 물대포 — 중간 속도, 큰 범위
-        else { speed = 360; r = 30; }                           // 사육사 그물 — 느리고 큼
+        if (o.throws === "dart") { speed = 780; r = 14; } // 수의사 마취총 — 빠르고 작음
+        else { speed = 360; r = 30; }                     // 사육사 그물 — 느리고 큼
         state.bullets.push({
           kind: o.throws,
           x: nx, y: ny,
@@ -561,7 +583,7 @@
       const dx = bt.x - p.x;
       const dy = bt.y - PLAYER_Y;
       if (Math.hypot(dx, dy) < bt.r + 24) {
-        const reason = (bt.kind === "net" || bt.kind === "dart" || bt.kind === "water") ? bt.kind : "trump";
+        const reason = (bt.kind === "net" || bt.kind === "dart") ? bt.kind : "trump";
         gameOver(reason);
         return;
       }
@@ -1480,10 +1502,8 @@
     const h = o.h;
     let uniform = "#7a6a3e", cap = "#4a5c2e", accent = "#d4c18b";
     let label = null;
-    if (o.sub === "police") {
-      uniform = "#1b2c48"; cap = "#0f1a30"; accent = "#e8c547"; label = "POLICE";
-    } else if (o.sub === "rescue") {
-      uniform = "#e0742a"; cap = "#ffffff"; accent = "#d62a2a"; label = "119";
+    if (o.sub === "vet") {
+      uniform = "#f0f4f6"; cap = "#d8dfe2"; accent = "#2a9a88"; label = "수의사";
     } else {
       label = "동물원";
     }
@@ -1552,6 +1572,22 @@
     ctx.moveTo(cx - 5, y + h * 0.26);
     ctx.lineTo(cx + 5, y + h * 0.26);
     ctx.stroke();
+    // vet-only: stethoscope draped over shoulders
+    if (o.sub === "vet") {
+      ctx.strokeStyle = "#1a1a1a"; ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(cx - 18, y + h * 0.34);
+      ctx.quadraticCurveTo(cx, y + h * 0.48, cx + 18, y + h * 0.34);
+      ctx.stroke();
+      ctx.fillStyle = "#c9cfd4";
+      ctx.beginPath();
+      ctx.arc(cx + 10, y + h * 0.5, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#3a3a3a";
+      ctx.beginPath();
+      ctx.arc(cx + 10, y + h * 0.5, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   function drawBullet(bt) {
@@ -1561,10 +1597,6 @@
     }
     if (bt.kind === "dart") {
       drawDart(bt);
-      return;
-    }
-    if (bt.kind === "water") {
-      drawWater(bt);
       return;
     }
     ctx.save();
@@ -1632,39 +1664,6 @@
     ctx.closePath();
     ctx.fill();
     ctx.restore();
-  }
-
-  function drawWater(bt) {
-    // 물대포 물덩이 — 반투명 파란 물방울 + 튀는 방울
-    const cx = bt.x, cy = bt.y, r = bt.r;
-    const ang = Math.atan2(bt.vy, bt.vx);
-    // motion trail (stretched water)
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(ang);
-    ctx.fillStyle = "rgba(100, 180, 230, 0.35)";
-    ctx.beginPath();
-    ctx.ellipse(-r * 0.4, 0, r * 1.4, r * 0.7, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-    // main water ball
-    ctx.fillStyle = "rgba(80, 160, 220, 0.85)";
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "rgba(160, 220, 255, 0.95)";
-    ctx.beginPath(); ctx.arc(cx - r * 0.3, cy - r * 0.3, r * 0.45, 0, Math.PI * 2); ctx.fill();
-    // splash droplets
-    ctx.fillStyle = "rgba(120, 200, 240, 0.7)";
-    for (let i = 0; i < 4; i++) {
-      const a = i * Math.PI / 2 + bt.spin;
-      const dx = Math.cos(a) * (r + 8);
-      const dy = Math.sin(a) * (r + 8);
-      ctx.beginPath(); ctx.arc(cx + dx, cy + dy, 3, 0, Math.PI * 2); ctx.fill();
-    }
-    // highlight
-    ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r - 1, -Math.PI * 0.8, -Math.PI * 0.3);
-    ctx.stroke();
   }
 
   function drawNet(bt) {
@@ -1766,30 +1765,6 @@
   function drawObstacle(o) {
     if (o.type === 0) {
       drawPerson(o);
-    } else if (o.type === 1) {
-      // wooden fence
-      ctx.fillStyle = "#6b4a2a";
-      ctx.fillRect(o.x, o.y + o.h * 0.35, o.w, 14);
-      ctx.fillRect(o.x, o.y + o.h * 0.7, o.w, 14);
-      ctx.fillStyle = "#8a5a3a";
-      const posts = Math.max(3, Math.round(o.w / 70));
-      for (let i = 0; i < posts; i++) {
-        const px = o.x + (i + 0.5) * (o.w / posts) - 8;
-        ctx.fillRect(px, o.y, 16, o.h);
-      }
-    } else if (o.type === 2) {
-      // barrel
-      ctx.fillStyle = "#a36b2a";
-      roundRect(o.x, o.y, o.w, o.h, 16);
-      ctx.fill();
-      ctx.strokeStyle = "#6b4a2a";
-      ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.moveTo(o.x + 6, o.y + o.h * 0.28);
-      ctx.lineTo(o.x + o.w - 6, o.y + o.h * 0.28);
-      ctx.moveTo(o.x + 6, o.y + o.h * 0.68);
-      ctx.lineTo(o.x + o.w - 6, o.y + o.h * 0.68);
-      ctx.stroke();
     } else if (o.type === 3) {
       // "female" wolf bait
       const cx = o.x + o.w / 2;
@@ -2053,6 +2028,39 @@
         ctx.moveTo(i, -7);
         ctx.quadraticCurveTo(i + 4, 0, i, 7);
         ctx.stroke();
+      }
+      ctx.restore();
+    } else if (o.sub === "hotdog") {
+      // hotdog — bun with sausage and mustard zigzag
+      ctx.save();
+      ctx.translate(cx, yy);
+      ctx.rotate(-0.15);
+      // bottom bun
+      ctx.fillStyle = "#d9a658";
+      roundRect(-30, 2, 60, 14, 6); ctx.fill();
+      // top bun
+      ctx.fillStyle = "#e6b870";
+      roundRect(-30, -14, 60, 14, 6); ctx.fill();
+      // sausage peeking out
+      ctx.fillStyle = "#c4523a";
+      roundRect(-26, -6, 52, 10, 5); ctx.fill();
+      ctx.fillStyle = "#8a2e1e";
+      roundRect(-26, -5, 52, 2, 1); ctx.fill();
+      // mustard zigzag
+      ctx.strokeStyle = "#ffce2a"; ctx.lineWidth = 3; ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(-22, -1);
+      ctx.lineTo(-12, -3);
+      ctx.lineTo(-2, -1);
+      ctx.lineTo(8, -3);
+      ctx.lineTo(18, -1);
+      ctx.stroke();
+      // sesame seeds on top bun
+      ctx.fillStyle = "#f6ecc0";
+      for (const sx of [-18, -6, 6, 18]) {
+        ctx.beginPath();
+        ctx.ellipse(sx, -10, 1.8, 1, 0.3, 0, Math.PI * 2);
+        ctx.fill();
       }
       ctx.restore();
     }
@@ -2410,12 +2418,27 @@
   }
 
   function drawIntroBg() {
-    // 동물원 사육장 — dirt floor + grass patches + perimeter fence (covers default road BG)
+    // dirt covers the screen at first; slides down off-screen during reveal to show gate+road
+    const t = state.introT;
+    const revealT = Math.max(0, Math.min(1, (t - 2.0) / 1.0)); // 0 at t=2.0, 1 at t=3.0
+    const dirtTop = revealT * H;
+    if (dirtTop >= H) return; // fully revealed, nothing to draw
+
+    // main dirt ground from dirtTop down to bottom
     ctx.fillStyle = "#7a5b3a";
-    ctx.fillRect(0, 0, W, H);
-    // grass patches
+    ctx.fillRect(0, dirtTop, W, H - dirtTop);
+    // soft seam at the edge so it doesn't look like a flat line
+    if (revealT > 0 && revealT < 1) {
+      const grad = ctx.createLinearGradient(0, dirtTop - 14, 0, dirtTop + 14);
+      grad.addColorStop(0, "rgba(122,91,58,0)");
+      grad.addColorStop(1, "rgba(58,38,20,0.7)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, dirtTop - 14, W, 28);
+    }
+    // grass patches (only within the visible dirt area)
     ctx.fillStyle = "#5a7a3a";
     for (let gy = 80; gy < H; gy += 110) {
+      if (gy < dirtTop - 8) continue;
       for (let gx = 40 + ((gy * 31) % 60); gx < W; gx += 130) {
         ctx.beginPath();
         ctx.ellipse(gx, gy, 22, 10, 0, 0, Math.PI * 2);
@@ -2425,31 +2448,33 @@
     // rocks
     ctx.fillStyle = "#8a7a5a";
     for (let i = 0; i < 12; i++) {
-      const rx = ((i * 167) % W);
-      const ry = ((i * 271) % H);
+      const rx = (i * 167) % W;
+      const ry = (i * 271) % H;
+      if (ry < dirtTop - 4) continue;
       ctx.beginPath();
       ctx.arc(rx, ry, 4 + (i % 3), 0, Math.PI * 2);
       ctx.fill();
     }
-    // perimeter fence at top (between the wolf and outside)
-    ctx.fillStyle = "#5a4a3a";
-    ctx.fillRect(0, 60, W, 12);
-    ctx.fillStyle = "#3a2a1a";
-    for (let fx = 0; fx < W; fx += 22) {
-      ctx.fillRect(fx, 72, 4, 160);
+    // perimeter fence at the top of the enclosure — visible only before reveal starts
+    if (revealT <= 0.02) {
+      ctx.fillStyle = "#5a4a3a";
+      ctx.fillRect(0, 60, W, 12);
+      ctx.fillStyle = "#3a2a1a";
+      for (let fx = 0; fx < W; fx += 22) {
+        ctx.fillRect(fx, 72, 4, 160);
+      }
     }
-    // hole + dirt mound BEHIND/AROUND the wolf — drawn before player so player sits in front
-    const t = state.introT;
+    // hole + dirt mound around the wolf (fades out during reveal)
     const digT = Math.min(1, t / 1.8);
+    const holeFade = 1 - revealT;
     const holeX = state.player.x;
     const holeY = PLAYER_Y + 28;
-    const holeR = 76 * digT;
-    if (holeR > 4) {
+    const holeR = 76 * digT * holeFade;
+    if (holeR > 4 && holeY >= dirtTop) {
       ctx.fillStyle = "#1a0e08";
       ctx.beginPath();
       ctx.ellipse(holeX, holeY, holeR, holeR * 0.55, 0, 0, Math.PI * 2);
       ctx.fill();
-      // dirt mound rim (top half, looks like piled dirt around the hole)
       ctx.fillStyle = "#5a4028";
       ctx.beginPath();
       ctx.ellipse(holeX - holeR * 0.7, holeY - 6, holeR * 0.5, holeR * 0.28, 0, 0, Math.PI * 2);
@@ -2469,13 +2494,12 @@
 
   function drawIntroFg() {
     const t = state.introT;
-    const dur = INTRO_DURATION;
     const holeX = state.player.x;
-    // dirt particle spray while digging (sprays sideways from the wolf)
+    // dirt particle spray while digging
     if (t < 1.8) {
       ctx.fillStyle = "#6a4a28";
       for (let i = 0; i < 12; i++) {
-        const sa = (t * 10 + i * 0.7);
+        const sa = t * 10 + i * 0.7;
         const side = i % 2 === 0 ? -1 : 1;
         const ang = side * (0.3 + (sa % 1.0) * 0.8);
         const dist = 30 + ((sa * 70) % 70);
@@ -2484,31 +2508,12 @@
         ctx.fillRect(dx, dy, 3, 3);
       }
     }
-    // hint text
-    if (t < 2.2) {
+    // hint text (only during digging phase)
+    if (t < 2.0) {
       ctx.fillStyle = `rgba(255, 220, 80, ${0.8 + Math.sin(t * 8) * 0.2})`;
       ctx.font = "bold 28px 'Apple SD Gothic Neo', sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("땅굴을 파는 중…", W / 2, 130);
-    }
-    // dirt cloud wipe (envelops everything) for the transition out
-    if (t > 2.2) {
-      const cloudT = Math.min(1, (t - 2.2) / 0.5);   // 2.2→2.7 expand
-      const fadeT = Math.max(0, Math.min(1, (t - 2.7) / 0.5)); // 2.7→3.2 fade
-      const alpha = (cloudT - fadeT * 0.7);
-      if (alpha > 0) {
-        ctx.fillStyle = `rgba(122, 91, 58, ${alpha})`;
-        ctx.fillRect(0, 0, W, H);
-        // billowing puff edges
-        ctx.fillStyle = `rgba(160, 120, 80, ${alpha * 0.7})`;
-        for (let i = 0; i < 24; i++) {
-          const a = (i / 24) * Math.PI * 2;
-          const r = 200 + Math.sin(t * 6 + i) * 30;
-          ctx.beginPath();
-          ctx.arc(W / 2 + Math.cos(a) * r * cloudT, PLAYER_Y + Math.sin(a) * r * cloudT * 0.7, 60 * cloudT, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
     }
   }
 
