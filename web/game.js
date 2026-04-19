@@ -2418,27 +2418,20 @@
   }
 
   function drawIntroBg() {
-    // dirt covers the screen at first; slides down off-screen during reveal to show gate+road
+    // dirt covers the full screen during intro; crossfades out at the end to reveal the gate+road
     const t = state.introT;
-    const revealT = Math.max(0, Math.min(1, (t - 2.0) / 1.0)); // 0 at t=2.0, 1 at t=3.0
-    const dirtTop = revealT * H;
-    if (dirtTop >= H) return; // fully revealed, nothing to draw
+    // alpha: 1 until t=2.6, linearly 1→0 across 2.6→3.2
+    const alpha = Math.max(0, Math.min(1, (INTRO_DURATION - t) / 0.6));
+    if (alpha <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = alpha;
 
-    // main dirt ground from dirtTop down to bottom
+    // main dirt ground — full screen
     ctx.fillStyle = "#7a5b3a";
-    ctx.fillRect(0, dirtTop, W, H - dirtTop);
-    // soft seam at the edge so it doesn't look like a flat line
-    if (revealT > 0 && revealT < 1) {
-      const grad = ctx.createLinearGradient(0, dirtTop - 14, 0, dirtTop + 14);
-      grad.addColorStop(0, "rgba(122,91,58,0)");
-      grad.addColorStop(1, "rgba(58,38,20,0.7)");
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, dirtTop - 14, W, 28);
-    }
-    // grass patches (only within the visible dirt area)
+    ctx.fillRect(0, 0, W, H);
+    // grass patches scattered across
     ctx.fillStyle = "#5a7a3a";
     for (let gy = 80; gy < H; gy += 110) {
-      if (gy < dirtTop - 8) continue;
       for (let gx = 40 + ((gy * 31) % 60); gx < W; gx += 130) {
         ctx.beginPath();
         ctx.ellipse(gx, gy, 22, 10, 0, 0, Math.PI * 2);
@@ -2450,27 +2443,23 @@
     for (let i = 0; i < 12; i++) {
       const rx = (i * 167) % W;
       const ry = (i * 271) % H;
-      if (ry < dirtTop - 4) continue;
       ctx.beginPath();
       ctx.arc(rx, ry, 4 + (i % 3), 0, Math.PI * 2);
       ctx.fill();
     }
-    // perimeter fence at the top of the enclosure — visible only before reveal starts
-    if (revealT <= 0.02) {
-      ctx.fillStyle = "#5a4a3a";
-      ctx.fillRect(0, 60, W, 12);
-      ctx.fillStyle = "#3a2a1a";
-      for (let fx = 0; fx < W; fx += 22) {
-        ctx.fillRect(fx, 72, 4, 160);
-      }
+    // perimeter fence at the top of the enclosure (between wolf and outside)
+    ctx.fillStyle = "#5a4a3a";
+    ctx.fillRect(0, 60, W, 12);
+    ctx.fillStyle = "#3a2a1a";
+    for (let fx = 0; fx < W; fx += 22) {
+      ctx.fillRect(fx, 72, 4, 160);
     }
-    // hole + dirt mound around the wolf (fades out during reveal)
+    // hole + dirt mound around the wolf
     const digT = Math.min(1, t / 1.8);
-    const holeFade = 1 - revealT;
     const holeX = state.player.x;
     const holeY = PLAYER_Y + 28;
-    const holeR = 76 * digT * holeFade;
-    if (holeR > 4 && holeY >= dirtTop) {
+    const holeR = 76 * digT;
+    if (holeR > 4) {
       ctx.fillStyle = "#1a0e08";
       ctx.beginPath();
       ctx.ellipse(holeX, holeY, holeR, holeR * 0.55, 0, 0, Math.PI * 2);
@@ -2490,6 +2479,7 @@
       ctx.ellipse(holeX + holeR * 0.7, holeY - 12, holeR * 0.45, holeR * 0.2, 0, 0, Math.PI * 2);
       ctx.fill();
     }
+    ctx.restore();
   }
 
   function drawIntroFg() {
