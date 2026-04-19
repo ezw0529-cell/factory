@@ -1669,31 +1669,98 @@
 
   function drawNet(bt) {
     const cx = bt.x, cy = bt.y, r = bt.r;
-    // rope rim
-    ctx.strokeStyle = "#5a3a20"; ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
-    // net mesh — crosshatch clipped to circle
+    const spin = bt.spin || 0;
     ctx.save();
-    ctx.beginPath(); ctx.arc(cx, cy, r - 1, 0, Math.PI * 2); ctx.clip();
-    ctx.strokeStyle = "rgba(40, 25, 10, 0.75)"; ctx.lineWidth = 1.5;
-    const step = 8;
-    ctx.rotate; // noop
-    for (let i = -r; i <= r; i += step) {
+    ctx.translate(cx, cy);
+    ctx.rotate(spin * 0.4);
+
+    // build an irregular, billowing outline (8-point polygon with per-vertex jitter)
+    const points = 10;
+    const ring = [];
+    for (let i = 0; i < points; i++) {
+      const a = (i / points) * Math.PI * 2;
+      const wobble = 0.78 + Math.sin(a * 3 + spin * 2) * 0.18;
+      ring.push({ a, x: Math.cos(a) * r * wobble, y: Math.sin(a) * r * wobble });
+    }
+
+    // weighted rope ends hanging off the rim
+    ctx.strokeStyle = "#3a2810";
+    ctx.lineWidth = 2;
+    for (let i = 0; i < points; i += 2) {
+      const p = ring[i];
+      const tx = p.x * 1.35;
+      const ty = p.y * 1.35;
       ctx.beginPath();
-      ctx.moveTo(cx - r, cy + i);
-      ctx.lineTo(cx + r, cy + i);
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(tx, ty);
+      ctx.stroke();
+      // small weight at the end
+      ctx.fillStyle = "#2a1a08";
+      ctx.beginPath();
+      ctx.arc(tx, ty, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // soft net "fabric" fill (translucent so you see through it)
+    ctx.fillStyle = "rgba(60, 42, 22, 0.25)";
+    ctx.beginPath();
+    ctx.moveTo(ring[0].x, ring[0].y);
+    for (let i = 1; i < points; i++) {
+      const prev = ring[i - 1];
+      const cur = ring[i];
+      const mx = (prev.x + cur.x) / 2;
+      const my = (prev.y + cur.y) / 2;
+      ctx.quadraticCurveTo(prev.x, prev.y, mx, my);
+    }
+    ctx.quadraticCurveTo(ring[points - 1].x, ring[points - 1].y, ring[0].x, ring[0].y);
+    ctx.closePath();
+    ctx.fill();
+
+    // diamond mesh — clipped to the irregular outline, rotated 45° for net look
+    ctx.save();
+    ctx.clip();
+    ctx.rotate(Math.PI / 4);
+    ctx.strokeStyle = "rgba(30, 18, 6, 0.85)";
+    ctx.lineWidth = 1.4;
+    const step = 9;
+    const span = r * 1.6;
+    for (let i = -span; i <= span; i += step) {
+      ctx.beginPath();
+      ctx.moveTo(-span, i);
+      ctx.lineTo(span, i);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(i, -span);
+      ctx.lineTo(i, span);
       ctx.stroke();
     }
-    for (let i = -r; i <= r; i += step) {
-      ctx.beginPath();
-      ctx.moveTo(cx + i, cy - r);
-      ctx.lineTo(cx + i, cy + r);
-      ctx.stroke();
+    // knots at intersections
+    ctx.fillStyle = "rgba(20, 12, 4, 0.95)";
+    for (let i = -span; i <= span; i += step) {
+      for (let j = -span; j <= span; j += step) {
+        if ((i * i + j * j) < r * r * 1.2) {
+          ctx.fillRect(i - 1, j - 1, 2, 2);
+        }
+      }
     }
     ctx.restore();
-    // rim highlight
-    ctx.strokeStyle = "#8a6a3a"; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI * 0.7, -Math.PI * 0.2); ctx.stroke();
+
+    // rope rim — thick outer cord following the irregular outline
+    ctx.strokeStyle = "#3a2614";
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(ring[0].x, ring[0].y);
+    for (let i = 1; i < points; i++) {
+      const prev = ring[i - 1];
+      const cur = ring[i];
+      const mx = (prev.x + cur.x) / 2;
+      const my = (prev.y + cur.y) / 2;
+      ctx.quadraticCurveTo(prev.x, prev.y, mx, my);
+    }
+    ctx.quadraticCurveTo(ring[points - 1].x, ring[points - 1].y, ring[0].x, ring[0].y);
+    ctx.stroke();
+
+    ctx.restore();
   }
 
   function drawObstacle(o) {
