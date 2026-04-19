@@ -273,7 +273,15 @@
       }
     }
 
-    return { ensure, isMuted, setMuted, sfx, startBgm, stopBgm };
+    function suspend() {
+      if (ctx && ctx.state === "running") ctx.suspend();
+    }
+    function resume() {
+      if (ctx && ctx.state === "suspended") ctx.resume();
+    }
+    function currentTrack() { return bgmTrack; }
+
+    return { ensure, isMuted, setMuted, sfx, startBgm, stopBgm, suspend, resume, currentTrack };
   })();
 
   const canvas = document.getElementById("game");
@@ -2935,6 +2943,21 @@
       showToast("복사 실패 — 브라우저 주소창 URL을 공유해줘");
     }
   }
+
+  let hiddenTrack = null;
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      hiddenTrack = audio.currentTrack();
+      audio.stopBgm();
+      audio.suspend();
+    } else {
+      audio.resume();
+      if (hiddenTrack && state.running && !audio.isMuted()) {
+        audio.startBgm(hiddenTrack);
+      }
+      hiddenTrack = null;
+    }
+  });
 
   document.getElementById("start-btn").addEventListener("click", (e) => {
     e.stopPropagation();
