@@ -1396,21 +1396,6 @@
     // entrance (the gap between pillars)
     ctx.fillStyle = "#3a3036";
     ctx.fillRect(x + W * 0.18 + 22, y + h - 174, W * 0.64 - 44, 174);
-    // broken cage door (askew) — the wolf left this way
-    ctx.fillStyle = "#2a2a30";
-    ctx.save();
-    ctx.translate(x + W * 0.5 - 30, y + h - 140);
-    ctx.rotate(-0.28);
-    ctx.fillRect(0, 0, 60, 90);
-    // bars
-    ctx.strokeStyle = "#1a1a1a"; ctx.lineWidth = 2;
-    for (let i = 0; i < 5; i++) {
-      ctx.beginPath();
-      ctx.moveTo(6 + i * 12, 4);
-      ctx.lineTo(6 + i * 12, 86);
-      ctx.stroke();
-    }
-    ctx.restore();
     // "탈출!" spray on gate
     ctx.fillStyle = "#d62a2a";
     ctx.font = "bold 26px 'Apple SD Gothic Neo', sans-serif";
