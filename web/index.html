@@ -22,7 +22,7 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg" />
 <link rel="apple-touch-icon" href="icon.svg" />
 <link rel="manifest" href="manifest.webmanifest" />
-<link rel="stylesheet" href="style.css?v=v1.4.17" />
+<link rel="stylesheet" href="style.css?v=v1.4.18" />
 </head>
 <body>
   <div id="stage">
@@ -30,8 +30,10 @@
     <canvas id="game" width="720" height="1280"></canvas>
     <div id="hud">
       <div id="score">점수 0</div>
-      <button id="mute-btn" class="mute-btn" aria-label="음소거 토글">🔊</button>
-      <div id="best">최고 0</div>
+      <div class="hud-right">
+        <div id="best">최고 0</div>
+        <button id="mute-btn" class="mute-btn" aria-label="음소거 토글">🔊</button>
+      </div>
     </div>
     <div id="start-overlay" class="overlay">
       <h1>늑구런</h1>
@@ -39,7 +41,7 @@
       <p class="hint">화면을 손가락으로 쓸어서 늑구를 좌우로 조종 · 사육사·그물을 피해 계속 북쪽으로!</p>
       <p class="hint" style="color:#ffb84a; font-style:italic;">…그 끝엔, 아무도 예상 못한 반전이 있다.</p>
       <button id="start-btn">탈출 시작!</button>
-      <p class="version">v1.4.17</p>
+      <p class="version">v1.4.18</p>
     </div>
     <div id="over-overlay" class="overlay hidden">
       <h2 id="over-title">잡혔다!</h2>
@@ -188,6 +190,6 @@
     </div>
    </div>
   </div>
-  <script src="game.js?v=v1.4.17"></script>
+  <script src="game.js?v=v1.4.18"></script>
 </body>
 </html>

@@ -36,8 +36,8 @@
     let bgmStep = 0;
     let bgmTrack = null;
 
-    const MASTER_VOL = 0.32; // 전체 캡: 부드럽게
-    const MUSIC_VOL = 0.55;  // 음악은 배경으로
+    const MASTER_VOL = 0.42; // 전체 캡: 부드럽게
+    const MUSIC_VOL = 0.7;   // 음악은 배경으로
     const SFX_VOL = 1.0;
 
     function ensure() {
@@ -110,7 +110,7 @@
       src.stop(t0 + dur + 0.05);
     }
 
-    function kick(when, vol) {
+    function kick(when, vol, bus) {
       if (!ctx) return;
       vol = vol != null ? vol : 0.1;
       const osc = ctx.createOscillator();
@@ -121,7 +121,7 @@
       g.gain.setValueAtTime(vol, when);
       g.gain.exponentialRampToValueAtTime(0.001, when + 0.14);
       osc.connect(g);
-      g.connect(musicGain);
+      g.connect(bus || musicGain);
       osc.start(when);
       osc.stop(when + 0.2);
     }
@@ -161,10 +161,47 @@
         setTimeout(() => tone(220, 0.34, { type: "sawtooth", vol: 0.14 }), 280);
       },
       victory() {
-        tone(523, 0.12, { type: "triangle", vol: 0.16 });
-        setTimeout(() => tone(659, 0.12, { type: "triangle", vol: 0.16 }), 110);
-        setTimeout(() => tone(784, 0.12, { type: "triangle", vol: 0.16 }), 220);
-        setTimeout(() => tone(1047, 0.3, { type: "triangle", vol: 0.18 }), 330);
+        // 스테이지 클리어 팡파르: 상행 아르페지오 + 마무리 코드
+        const TRI = "triangle", SQ = "square";
+        const notes = [
+          [0,   523, 0.12, TRI, 0.18], // C5
+          [0,   262, 0.12, SQ,  0.09], // C4 bass
+          [130, 659, 0.12, TRI, 0.18], // E5
+          [130, 330, 0.12, SQ,  0.09],
+          [260, 784, 0.12, TRI, 0.18], // G5
+          [260, 392, 0.12, SQ,  0.09],
+          [390, 1047, 0.14, TRI, 0.2], // C6
+          [390, 523, 0.14, SQ,  0.1],
+          [560, 988, 0.1, TRI, 0.16], // B5
+          [670, 1047, 0.1, TRI, 0.16], // C6
+          [780, 1175, 0.1, TRI, 0.16], // D6
+          [890, 1319, 0.14, TRI, 0.18], // E6
+          // final held C major triad
+          [1050, 1047, 0.9, TRI, 0.2],
+          [1050, 1319, 0.9, TRI, 0.15],
+          [1050, 1568, 0.9, SQ,  0.09],
+          [1050, 523,  0.9, SQ,  0.1],
+        ];
+        for (const [delay, f, d, t, v] of notes) {
+          setTimeout(() => tone(f, d, { type: t, vol: v }), delay);
+        }
+        if (ctx) {
+          kick(ctx.currentTime, 0.14, sfxGain);
+          kick(ctx.currentTime + 0.39, 0.14, sfxGain);
+          kick(ctx.currentTime + 1.05, 0.18, sfxGain);
+        }
+      },
+      throwNet() {
+        tone(520, 0.14, { type: "triangle", slideTo: 260, vol: 0.07 });
+        noise(0.12, { filterType: "bandpass", filterFreq: 900, vol: 0.04 });
+      },
+      throwDart() {
+        tone(1500, 0.05, { type: "square", slideTo: 2200, vol: 0.06 });
+        noise(0.04, { filterType: "highpass", filterFreq: 4200, vol: 0.04 });
+      },
+      bossFire() {
+        tone(180, 0.18, { type: "sawtooth", slideTo: 70, vol: 0.11 });
+        noise(0.16, { filterType: "lowpass", filterFreq: 520, vol: 0.07 });
       },
       tap() {
         tone(520, 0.04, { type: "square", vol: 0.08 });
@@ -761,6 +798,8 @@
           r,
           spin: 0,
         });
+        if (o.throws === "dart") audio.sfx.throwDart();
+        else audio.sfx.throwNet();
       }
     }
     state.obstacles = state.obstacles.filter((o) => o.y < H + 60);
@@ -794,6 +833,7 @@
               r: 26,
               spin: 0,
             });
+            audio.sfx.bossFire();
             b.fireTimer = 0.8;
           }
         }
