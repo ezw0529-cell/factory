@@ -177,6 +177,94 @@ button:active {
   box-shadow: 0 2px 0 #b08a12, 0 4px 10px rgba(0, 0, 0, 0.3);
 }
 
+.btn-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35), 0 10px 24px rgba(0, 0, 0, 0.3);
+  font-size: clamp(16px, 4.2vw, 22px);
+  padding: 16px 26px;
+}
+.btn-secondary:active {
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35), 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 80px;
+  transform: translateX(-50%) translateY(12px);
+  background: rgba(0, 0, 0, 0.88);
+  color: #fff;
+  padding: 12px 22px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  z-index: 100;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.update-banner {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%) translateY(16px);
+  background: rgba(15, 22, 35, 0.95);
+  border: 1px solid rgba(255, 216, 74, 0.45);
+  color: #fff;
+  padding: 8px 8px 8px 16px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 150;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  max-width: 90vw;
+}
+.update-banner.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.update-banner button {
+  margin: 0;
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 7px 14px;
+  border-radius: 999px;
+}
+.update-banner .update-reload {
+  background: #ffd84a;
+  color: #1a1a1a;
+}
+.update-banner .update-dismiss {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 18px;
+  padding: 2px 8px;
+  font-weight: 400;
+}
+
 #credits-overlay {
   background: radial-gradient(ellipse at top, #1a2a3e 0%, #05080f 90%);
   padding: 0;
@@ -290,17 +378,21 @@ button:active {
   opacity: 0.85;
 }
 
-#credits-restart-btn {
+#credits-overlay .btn-row {
   position: absolute;
   bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 4;
-  padding: 14px 30px;
-  font-size: clamp(18px, 4.4vw, 24px);
-  margin-top: 0;
+  gap: 8px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
-#credits-restart-btn:active {
-  transform: translateX(-50%) translateY(3px);
+#credits-restart-btn,
+#credits-share-btn {
+  padding: 12px 18px;
+  font-size: clamp(14px, 3.6vw, 20px);
+  margin-top: 0;
+  white-space: nowrap;
 }

@@ -273,7 +273,15 @@
       }
     }
 
-    return { ensure, isMuted, setMuted, sfx, startBgm, stopBgm };
+    function suspend() {
+      if (ctx && ctx.state === "running") ctx.suspend();
+    }
+    function resume() {
+      if (ctx && ctx.state === "suspended") ctx.resume();
+    }
+    function currentTrack() { return bgmTrack; }
+
+    return { ensure, isMuted, setMuted, sfx, startBgm, stopBgm, suspend, resume, currentTrack };
   })();
 
   const canvas = document.getElementById("game");
@@ -2896,6 +2904,98 @@
     else if (e.code === "ArrowRight" || e.code === "KeyD") state.keyRight = false;
   });
 
+  function showToast(msg) {
+    const t = document.createElement("div");
+    t.className = "toast";
+    t.textContent = msg;
+    document.body.appendChild(t);
+    requestAnimationFrame(() => t.classList.add("show"));
+    setTimeout(() => {
+      t.classList.remove("show");
+      setTimeout(() => t.remove(), 300);
+    }, 1800);
+  }
+
+  async function shareResult(kind) {
+    const url = window.location.origin + window.location.pathname;
+    const score = state.score;
+    let text;
+    if (kind === "victory") {
+      text = `자유를 찾아 떠난 늑구, 엔딩까지 돌파! 🐺 최종 ${score}점`;
+    } else {
+      text = `자유를 향해 ${score}점... 늑구런에서 잡혔다 🐺 너는 얼마나 가?`;
+    }
+    const fullText = `${text}\n${url}`;
+    audio.ensure();
+    audio.sfx.tap();
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "늑구런", text, url });
+        return;
+      } catch (e) {
+        if (e && e.name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(fullText);
+      showToast("링크가 복사됐어요!");
+    } catch (e) {
+      showToast("복사 실패 — 브라우저 주소창 URL을 공유해줘");
+    }
+  }
+
+  let hiddenTrack = null;
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      hiddenTrack = audio.currentTrack();
+      audio.stopBgm();
+      audio.suspend();
+    } else {
+      audio.resume();
+      if (hiddenTrack && state.running && !audio.isMuted()) {
+        audio.startBgm(hiddenTrack);
+      }
+      hiddenTrack = null;
+      checkVersion();
+    }
+  });
+
+  const CURRENT_VERSION = "v1.4.25";
+  let updateBannerShown = false;
+  async function checkVersion() {
+    if (updateBannerShown) return;
+    try {
+      const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) return;
+      const data = await r.json();
+      if (data && data.version && data.version !== CURRENT_VERSION) {
+        showUpdateBanner();
+      }
+    } catch (e) { /* offline — ignore */ }
+  }
+  function showUpdateBanner() {
+    if (updateBannerShown) return;
+    updateBannerShown = true;
+    const b = document.createElement("div");
+    b.className = "update-banner";
+    b.innerHTML = '<span>🎉 새 버전이 나왔어요</span>' +
+      '<button class="update-reload">새로고침</button>' +
+      '<button class="update-dismiss" aria-label="닫기">×</button>';
+    document.body.appendChild(b);
+    b.querySelector(".update-reload").addEventListener("click", (e) => {
+      e.stopPropagation();
+      location.reload();
+    });
+    b.querySelector(".update-dismiss").addEventListener("click", (e) => {
+      e.stopPropagation();
+      b.classList.remove("show");
+      setTimeout(() => b.remove(), 300);
+    });
+    requestAnimationFrame(() => b.classList.add("show"));
+  }
+  setTimeout(checkVersion, 60_000);
+  setInterval(checkVersion, 5 * 60_000);
+
   document.getElementById("start-btn").addEventListener("click", (e) => {
     e.stopPropagation();
     audio.ensure();
@@ -2914,6 +3014,14 @@
     audio.sfx.tap();
     creditsOverlay.classList.add("hidden");
     start();
+  });
+  document.getElementById("share-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    shareResult("gameover");
+  });
+  document.getElementById("credits-share-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    shareResult("victory");
   });
 
   const muteBtn = document.getElementById("mute-btn");
