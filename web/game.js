@@ -1329,9 +1329,9 @@
     ctx.fillStyle = "#ffd84a";
     ctx.font = "bold 30px 'Apple SD Gothic Neo', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("선", sbX + sbW / 2, sbY + 46);
-    ctx.fillText("심", sbX + sbW / 2, sbY + 108);
-    ctx.fillText("당", sbX + sbW / 2, sbY + 170);
+    ctx.fillText("빵", sbX + sbW / 2, sbY + 46);
+    ctx.fillText("맛", sbX + sbW / 2, sbY + 108);
+    ctx.fillText("집", sbX + sbW / 2, sbY + 170);
 
     // horizontal cream banner — centered on the visible half of the facade
     const bnWidth = Math.min(vRight - vLeft - sbW - 20, 170);
@@ -1377,7 +1377,7 @@
     ctx.fillStyle = "#fff4dc";
     ctx.font = "bold 8px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("CAKE BOUTIQUE", x + w / 2, y + h - 36);
+    ctx.fillText("FRESH BAKERY", x + w / 2, y + h - 36);
 
     // glass storefront
     ctx.fillStyle = "#f6ecd2";
@@ -2975,7 +2975,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.29";
+  const CURRENT_VERSION = "v1.4.30";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
