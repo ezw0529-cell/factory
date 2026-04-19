@@ -329,7 +329,7 @@
     sungsimdangSpawned: false,
     stadiumSpawned: false,
     femaleSpawned: false,
-    breadDropQueue: 0, // number of bread items still to drop after 성심당
+    breadDropQueue: 0, // number of bread items still to drop after the bakery
     breadDropTimer: 0,
     bonusTimer: 3.5,
     bonusPoints: 0,
@@ -383,7 +383,7 @@
     const x = side === "L" ? -60 : W - w + 60;  // extends past the sidewalk
     const y = -h - 40;
     state.scenery.push({ kind: "sungsimdang_big", x, y, w, h, label: null });
-    // place 3 튀김소보로 bonuses on the road right next to the bakery (stacked vertically)
+    // place 3 bread bonuses on the road right next to the bakery (stacked vertically)
     const bw = 80, bh = 80;
     const bx = side === "L"
       ? x + w + 30                     // right edge of left-side bakery → into road
@@ -1329,9 +1329,9 @@
     ctx.fillStyle = "#ffd84a";
     ctx.font = "bold 30px 'Apple SD Gothic Neo', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("선", sbX + sbW / 2, sbY + 46);
-    ctx.fillText("심", sbX + sbW / 2, sbY + 108);
-    ctx.fillText("당", sbX + sbW / 2, sbY + 170);
+    ctx.fillText("빵", sbX + sbW / 2, sbY + 46);
+    ctx.fillText("맛", sbX + sbW / 2, sbY + 108);
+    ctx.fillText("집", sbX + sbW / 2, sbY + 170);
 
     // horizontal cream banner — centered on the visible half of the facade
     const bnWidth = Math.min(vRight - vLeft - sbW - 20, 170);
@@ -1345,7 +1345,7 @@
     ctx.fillStyle = "#c2342a";
     ctx.font = "bold 20px 'Apple SD Gothic Neo', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("튀김소보로", bnCx, y + 207);
+    ctx.fillText("갓 구운 빵", bnCx, y + 207);
 
     // arched windows (2 rows of 2, larger for the bigger facade)
     for (let r = 0; r < 2; r++) {
@@ -1377,7 +1377,7 @@
     ctx.fillStyle = "#fff4dc";
     ctx.font = "bold 8px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("CAKE BOUTIQUE", x + w / 2, y + h - 36);
+    ctx.fillText("FRESH BAKERY", x + w / 2, y + h - 36);
 
     // glass storefront
     ctx.fillStyle = "#f6ecd2";
@@ -1612,7 +1612,7 @@
       }
     }
 
-    // team banner — clamp to the on-screen half so '하나' isn't clipped
+    // team banner — clamp to the on-screen half so the label isn't clipped
     const bnw = 230;
     const bnh = 34;
     const bnCx = Math.max(bnw / 2 + 12, Math.min(W - bnw / 2 - 12, cx));
@@ -1626,7 +1626,7 @@
     ctx.font = "bold 22px 'Apple SD Gothic Neo', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("하나 이겼으 파크", bnCx, bny + bnh / 2);
+    ctx.fillText("⚾ 야구장", bnCx, bny + bnh / 2);
     ctx.textBaseline = "alphabetic";
 
     // tiny spectators as dots around the rim
@@ -2175,7 +2175,7 @@
     const bob = Math.sin(t * 1.3) * 3;
     const yy = cy + bob;
     if (o.sub === "bread") {
-      // 튀김소보로 — warm brown round bread with light highlights
+      // bread bonus — warm brown round bread with light highlights
       ctx.fillStyle = "#8a4a1a";
       ctx.beginPath();
       ctx.ellipse(cx, yy, 28, 22, 0, 0, Math.PI * 2);
@@ -2975,7 +2975,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.27";
+  const CURRENT_VERSION = "v1.4.30";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
