@@ -7,14 +7,15 @@
   const PLAYER_Y = 980;
   const PLAYER_MARGIN = 30;
 
-  const SCROLL_START = 420;
-  const SCROLL_MAX = 950;
+  const SCROLL_START = 340;
+  const SCROLL_MAX = 1000;
   const SCROLL_ACCEL = 8;
+  const SCROLL_RAMP_DIST = 9000;
 
   const OBS_W = 120;
   const OBS_H = 130;
-  const SPAWN_MIN = 0.85;
-  const SPAWN_MAX = 1.7;
+  const SPAWN_MIN = 1.05;
+  const SPAWN_MAX = 1.95;
 
   const STEER_SPEED = 1800;
 
@@ -33,7 +34,7 @@
   const creditsOverlay = document.getElementById("credits-overlay");
   const creditsScroll = document.getElementById("credits-scroll");
 
-  const BOSS_SCORE = 560;
+  const BOSS_SCORE = 640;
   const INTRO_DURATION = 3.2;
 
   const state = {
@@ -67,7 +68,7 @@
     femaleSpawned: false,
     breadDropQueue: 0, // number of bread items still to drop after 성심당
     breadDropTimer: 0,
-    bonusTimer: 6.0,
+    bonusTimer: 3.5,
     bonusPoints: 0,
     goraniTimer: 9.0,
     scoreFloats: [], // { x, y, t, text }
@@ -190,13 +191,11 @@
     state.femaleSpawned = false;
     state.breadDropQueue = 0;
     state.breadDropTimer = 0;
-    state.bonusTimer = 6.0;
+    state.bonusTimer = 3.5;
     state.bonusPoints = 0;
     state.goraniTimer = 9.0;
     state.scoreFloats = [];
     state.reveal = null;
-    // zoo gate behind the wolf at the very start
-    state.scenery.push({ kind: "zoo_gate", x: 0, y: 260, w: W, h: 320 });
     scoreEl.textContent = "점수 0";
   }
 
@@ -380,7 +379,10 @@
       return;
     }
 
-    state.scroll = Math.min(SCROLL_MAX, state.scroll + SCROLL_ACCEL * dt);
+    // nonlinear difficulty ramp — slower start, steeper late
+    const rampT = Math.min(1, state.distance / SCROLL_RAMP_DIST);
+    const accelNow = SCROLL_ACCEL * (0.45 + 1.35 * rampT * rampT);
+    state.scroll = Math.min(SCROLL_MAX, state.scroll + accelNow * dt);
     state.distance += state.scroll * dt;
     const newScore = Math.floor(state.distance / 25) + state.bonusPoints;
     if (newScore !== state.score) {
@@ -431,12 +433,12 @@
       spawnStadium();
     }
     // periodic bone/chew bonus items during normal phase
-    if (state.phase === "normal" && state.distance > 3500) {
+    if (state.phase === "normal" && state.distance > 2200) {
       state.bonusTimer -= dt;
       if (state.bonusTimer <= 0) {
         const sub = Math.random() < 0.5 ? "bone" : "chew";
         spawnBonus(sub);
-        state.bonusTimer = 7 + Math.random() * 5;
+        state.bonusTimer = 4.0 + Math.random() * 2.8;
       }
     }
     // 고라니 돌진 — 빠르게 내려오는 장애물
@@ -488,8 +490,8 @@
       if (state.spawnTimer <= 0) {
         spawnObstacle();
         const ratio = (state.scroll - SCROLL_START) / (SCROLL_MAX - SCROLL_START);
-        const minI = Math.max(0.28, SPAWN_MIN - ratio * 0.28);
-        const maxI = Math.max(0.45, SPAWN_MAX - ratio * 0.5);
+        const minI = Math.max(0.32, SPAWN_MIN - ratio * 0.6);
+        const maxI = Math.max(0.58, SPAWN_MAX - ratio * 1.0);
         state.spawnTimer = minI + Math.random() * (maxI - minI);
       }
     }
@@ -1350,66 +1352,8 @@
     }
   }
 
-  function drawZooGate(s) {
-    const x = s.x, y = s.y, w = s.w, h = s.h;
-    // ground/plaza behind the gate
-    ctx.fillStyle = "#8a8268";
-    ctx.fillRect(x, y + h - 80, w, 80);
-    // cage compound behind (dark bars over field of animal dots)
-    ctx.fillStyle = "#2a4a2a";
-    ctx.fillRect(x, y, w, h - 80);
-    // tiny enclosure structures / cages in the background
-    ctx.fillStyle = "#6a5a3a";
-    for (let i = 0; i < 6; i++) {
-      const bx = x + 30 + i * ((w - 60) / 6);
-      ctx.fillRect(bx, y + 40, 40, 40);
-      // bar lines
-      ctx.strokeStyle = "rgba(0,0,0,0.45)"; ctx.lineWidth = 1;
-      for (let b = 0; b < 5; b++) {
-        ctx.beginPath();
-        ctx.moveTo(bx + 4 + b * 8, y + 44);
-        ctx.lineTo(bx + 4 + b * 8, y + 76);
-        ctx.stroke();
-      }
-    }
-    // gate side pillars
-    ctx.fillStyle = "#4a3528";
-    ctx.fillRect(x + W * 0.16, y + h - 180, 22, 180);
-    ctx.fillRect(x + W * 0.82 - 22, y + h - 180, 22, 180);
-    // pillar caps
-    ctx.fillStyle = "#6a4a38";
-    ctx.fillRect(x + W * 0.16 - 4, y + h - 190, 30, 14);
-    ctx.fillRect(x + W * 0.82 - 26, y + h - 190, 30, 14);
-    // arch beam
-    ctx.fillStyle = "#4a3528";
-    ctx.fillRect(x + W * 0.16, y + h - 200, W * 0.66, 26);
-    // arch sign (cream background, big "동물원")
-    ctx.fillStyle = "#f6ecd2";
-    roundRect(x + W * 0.22, y + h - 198, W * 0.56, 22, 3);
-    ctx.fill();
-    ctx.strokeStyle = "#4a3528"; ctx.lineWidth = 2;
-    ctx.strokeRect(x + W * 0.22, y + h - 198, W * 0.56, 22);
-    ctx.fillStyle = "#2a1a10";
-    ctx.font = "bold 22px 'Apple SD Gothic Neo', sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("동물원", x + W / 2, y + h - 181);
-    // entrance (the gap between pillars)
-    ctx.fillStyle = "#3a3036";
-    ctx.fillRect(x + W * 0.18 + 22, y + h - 174, W * 0.64 - 44, 174);
-    // "탈출!" spray on gate
-    ctx.fillStyle = "#d62a2a";
-    ctx.font = "bold 26px 'Apple SD Gothic Neo', sans-serif";
-    ctx.save();
-    ctx.translate(x + W * 0.32, y + h - 40);
-    ctx.rotate(-0.12);
-    ctx.fillText("탈출!", 0, 0);
-    ctx.restore();
-  }
-
   function drawScenery(s) {
-    if (s.kind === "zoo_gate") {
-      drawZooGate(s);
-    } else if (s.kind === "sungsimdang_big") {
+    if (s.kind === "sungsimdang_big") {
       drawSungsimdangBig(s);
     } else if (s.kind === "stadium_big") {
       drawStadiumBig(s);
@@ -2408,13 +2352,78 @@
       ctx.arc(rx, ry, 4 + (i % 3), 0, Math.PI * 2);
       ctx.fill();
     }
-    // perimeter fence at the top of the enclosure (between wolf and outside)
-    ctx.fillStyle = "#5a4a3a";
-    ctx.fillRect(0, 60, W, 12);
-    ctx.fillStyle = "#3a2a1a";
-    for (let fx = 0; fx < W; fx += 22) {
-      ctx.fillRect(fx, 72, 4, 160);
+    // zoo cage bars — heavy iron bars between wolf and outside
+    const barTop = 140;
+    const barBottom = 420;
+    const railH = 18;
+    // top rail (concrete/painted frame)
+    const topRail = ctx.createLinearGradient(0, barTop, 0, barTop + railH);
+    topRail.addColorStop(0, "#6a5a46");
+    topRail.addColorStop(1, "#3a2e20");
+    ctx.fillStyle = topRail;
+    ctx.fillRect(0, barTop, W, railH);
+    // bottom rail
+    const botRail = ctx.createLinearGradient(0, barBottom - railH, 0, barBottom);
+    botRail.addColorStop(0, "#3a2e20");
+    botRail.addColorStop(1, "#6a5a46");
+    ctx.fillStyle = botRail;
+    ctx.fillRect(0, barBottom - railH, W, railH);
+    // rivets on rails
+    ctx.fillStyle = "#1a1208";
+    for (let rx = 26; rx < W; rx += 54) {
+      ctx.beginPath(); ctx.arc(rx, barTop + railH / 2, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(rx, barBottom - railH / 2, 3, 0, Math.PI * 2); ctx.fill();
     }
+    // vertical bars — thick iron with shadow + highlight for 3D feel
+    const barSpacing = 44;
+    const barWidth = 14;
+    const barYTop = barTop + railH;
+    const barYBot = barBottom - railH;
+    for (let fx = 18; fx < W; fx += barSpacing) {
+      // cast shadow on the ground behind
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.fillRect(fx + 4, barYTop + 4, barWidth, barYBot - barYTop);
+      // bar body
+      const barGrad = ctx.createLinearGradient(fx, 0, fx + barWidth, 0);
+      barGrad.addColorStop(0, "#1a1208");
+      barGrad.addColorStop(0.4, "#4a3a28");
+      barGrad.addColorStop(0.6, "#6a5a42");
+      barGrad.addColorStop(1, "#2a1e12");
+      ctx.fillStyle = barGrad;
+      ctx.fillRect(fx, barYTop, barWidth, barYBot - barYTop);
+      // rust spots
+      ctx.fillStyle = "rgba(140, 70, 30, 0.55)";
+      ctx.fillRect(fx + 2, barYTop + 40, 3, 18);
+      ctx.fillRect(fx + 8, barYTop + 120, 2, 14);
+      ctx.fillRect(fx + 3, barYTop + 200, 3, 10);
+    }
+    // chain-link pattern in the gaps between bars (subtle, darker tone)
+    ctx.strokeStyle = "rgba(30, 20, 12, 0.32)";
+    ctx.lineWidth = 1;
+    for (let fx = 18 + barWidth + 4; fx < W; fx += barSpacing) {
+      for (let ly = barYTop + 8; ly < barYBot; ly += 12) {
+        ctx.beginPath();
+        ctx.moveTo(fx, ly);
+        ctx.lineTo(fx + (barSpacing - barWidth - 8), ly + 6);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(fx, ly + 6);
+        ctx.lineTo(fx + (barSpacing - barWidth - 8), ly);
+        ctx.stroke();
+      }
+    }
+    // warning sign bolted to the bars
+    const sx = W * 0.5 - 56, sy = barTop + 30;
+    ctx.fillStyle = "#ffd42a";
+    roundRect(sx, sy, 112, 44, 3); ctx.fill();
+    ctx.strokeStyle = "#1a1208"; ctx.lineWidth = 3;
+    roundRect(sx, sy, 112, 44, 3); ctx.stroke();
+    ctx.fillStyle = "#1a1208";
+    ctx.font = "bold 22px 'Apple SD Gothic Neo', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("위험·맹수", sx + 56, sy + 22);
+    ctx.textBaseline = "alphabetic";
     // hole + dirt mound around the wolf
     const digT = Math.min(1, t / 1.8);
     const holeX = state.player.x;
