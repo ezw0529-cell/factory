@@ -1612,7 +1612,7 @@
       }
     }
 
-    // team banner — clamp to the on-screen half so '하나' isn't clipped
+    // team banner — clamp to the on-screen half so the label isn't clipped
     const bnw = 230;
     const bnh = 34;
     const bnCx = Math.max(bnw / 2 + 12, Math.min(W - bnw / 2 - 12, cx));
@@ -1626,7 +1626,7 @@
     ctx.font = "bold 22px 'Apple SD Gothic Neo', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("하나 이겼으 파크", bnCx, bny + bnh / 2);
+    ctx.fillText("⚾ 야구장", bnCx, bny + bnh / 2);
     ctx.textBaseline = "alphabetic";
 
     // tiny spectators as dots around the rim
@@ -2975,7 +2975,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.28";
+  const CURRENT_VERSION = "v1.4.29";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
