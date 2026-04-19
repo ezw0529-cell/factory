@@ -33,7 +33,7 @@
   const creditsOverlay = document.getElementById("credits-overlay");
   const creditsScroll = document.getElementById("credits-scroll");
 
-  const BOSS_SCORE = 440;
+  const BOSS_SCORE = 560;
 
   const state = {
     running: false,
