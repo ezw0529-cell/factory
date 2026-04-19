@@ -247,13 +247,11 @@
   function spawnObstacle() {
     const kind = Math.random();
     let type, w, h, sub = null;
-    if (kind < 0.55) {
+    if (kind < 0.65) {
       type = 0; w = 110; h = 150;
       sub = PERSON_KINDS[Math.floor(Math.random() * PERSON_KINDS.length)];
-    } else if (kind < 0.8) {
-      type = 1; w = 220 + Math.random() * 160; h = 70;
     } else {
-      type = 2; w = 110; h = 110;
+      type = 1; w = 220 + Math.random() * 160; h = 70;
     }
     const x = PLAYER_MARGIN + Math.random() * (W - PLAYER_MARGIN * 2 - w);
     const o = { type, sub, x, y: -h - 40, w, h, passed: false, phase: Math.random() * Math.PI * 2 };
@@ -1773,6 +1771,11 @@
   function drawGorani(o) {
     const cx = o.x + o.w / 2;
     const cy = o.y + o.h / 2;
+    // flip so the head faces the direction of travel (downward)
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(Math.PI);
+    ctx.translate(-cx, -cy);
     const t = performance.now() / 80 + o.phase; // fast gallop
     const bob = Math.sin(t) * 3;
     const yy = cy + bob;
@@ -1868,6 +1871,7 @@
     ctx.beginPath();
     ctx.moveTo(cx + 5, yy - 70); ctx.lineTo(cx + 6, yy - 62); ctx.lineTo(cx + 3, yy - 70); ctx.closePath();
     ctx.fill();
+    ctx.restore();
   }
 
   function drawBonus(o) {
@@ -1983,12 +1987,14 @@
       { row: 2, color: "#232830", tank: "#d4842a", offset: 60,  flip: false },
       { row: 2, color: "#1a1a22", tank: "#c67020", offset: 380, flip: true },
     ];
+    // use a monotonic timebase so the fleet doesn't jump when phaseT resets between approach→boss
+    const tNow = performance.now() / 1000;
     for (const s of fleet) {
       const r = rows[s.row];
       const len = 160 * r.scale;
       const ht = 34 * r.scale;
       const travel = (W + len + 200);
-      const raw = (state.phaseT * r.speed + s.offset) % travel;
+      const raw = (tNow * r.speed + s.offset) % travel;
       const x = raw - len - 100;
       drawTankerSide(x, r.y, len, ht, s.flip, s.color, s.tank);
     }
