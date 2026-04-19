@@ -1739,18 +1739,13 @@
     ctx.quadraticCurveTo(cx + 70, y + b.h * 0.22, cx + 96, y + b.h * 0.34);
     ctx.quadraticCurveTo(cx + 30, y + b.h * 0.3, cx - 80, y + b.h * 0.32);
     ctx.fill();
-    // subtle strand lines — thin darker strokes in same hue family
-    ctx.strokeStyle = "rgba(160, 110, 30, 0.35)";
-    ctx.lineWidth = 1.5;
-    ctx.lineCap = "round";
-    for (let i = 0; i < 7; i++) {
-      const t = i / 6;
-      const sx = cx - 80 + t * 170;
-      ctx.beginPath();
-      ctx.moveTo(sx, y + b.h * 0.32);
-      ctx.quadraticCurveTo(sx + 20, y + b.h * 0.1 - t * 10, sx + 40 - t * 20, y - 10 + t * 8);
-      ctx.stroke();
-    }
+    // subtle base shadow — darker tone at hairline for depth (no diagonal strands)
+    ctx.fillStyle = "rgba(160, 110, 30, 0.22)";
+    ctx.beginPath();
+    ctx.moveTo(cx - 90, y + b.h * 0.34);
+    ctx.quadraticCurveTo(cx, y + b.h * 0.26, cx + 100, y + b.h * 0.32);
+    ctx.quadraticCurveTo(cx, y + b.h * 0.3, cx - 90, y + b.h * 0.34);
+    ctx.fill();
     // squint eyes
     ctx.strokeStyle = "#111";
     ctx.lineWidth = 4;
