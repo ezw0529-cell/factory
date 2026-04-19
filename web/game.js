@@ -2896,6 +2896,46 @@
     else if (e.code === "ArrowRight" || e.code === "KeyD") state.keyRight = false;
   });
 
+  function showToast(msg) {
+    const t = document.createElement("div");
+    t.className = "toast";
+    t.textContent = msg;
+    document.body.appendChild(t);
+    requestAnimationFrame(() => t.classList.add("show"));
+    setTimeout(() => {
+      t.classList.remove("show");
+      setTimeout(() => t.remove(), 300);
+    }, 1800);
+  }
+
+  async function shareResult(kind) {
+    const url = window.location.origin + window.location.pathname;
+    const score = state.score;
+    let text;
+    if (kind === "victory") {
+      text = `늑구 탈출 엔딩까지 돌파! 🐺 최종 ${score}점`;
+    } else {
+      text = `늑구런 ${score}점에서 잡혔다 🐺 너는 얼마나 가?`;
+    }
+    const fullText = `${text}\n${url}`;
+    audio.ensure();
+    audio.sfx.tap();
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "늑구런", text, url });
+        return;
+      } catch (e) {
+        if (e && e.name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(fullText);
+      showToast("링크가 복사됐어요!");
+    } catch (e) {
+      showToast("복사 실패 — 브라우저 주소창 URL을 공유해줘");
+    }
+  }
+
   document.getElementById("start-btn").addEventListener("click", (e) => {
     e.stopPropagation();
     audio.ensure();
@@ -2914,6 +2954,14 @@
     audio.sfx.tap();
     creditsOverlay.classList.add("hidden");
     start();
+  });
+  document.getElementById("share-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    shareResult("gameover");
+  });
+  document.getElementById("credits-share-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    shareResult("victory");
   });
 
   const muteBtn = document.getElementById("mute-btn");

@@ -177,6 +177,48 @@ button:active {
   box-shadow: 0 2px 0 #b08a12, 0 4px 10px rgba(0, 0, 0, 0.3);
 }
 
+.btn-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35), 0 10px 24px rgba(0, 0, 0, 0.3);
+  font-size: clamp(16px, 4.2vw, 22px);
+  padding: 16px 26px;
+}
+.btn-secondary:active {
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35), 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 80px;
+  transform: translateX(-50%) translateY(12px);
+  background: rgba(0, 0, 0, 0.88);
+  color: #fff;
+  padding: 12px 22px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  z-index: 100;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 #credits-overlay {
   background: radial-gradient(ellipse at top, #1a2a3e 0%, #05080f 90%);
   padding: 0;

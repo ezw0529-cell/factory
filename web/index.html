@@ -22,7 +22,7 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg" />
 <link rel="apple-touch-icon" href="icon.svg" />
 <link rel="manifest" href="manifest.webmanifest" />
-<link rel="stylesheet" href="style.css?v=v1.4.19" />
+<link rel="stylesheet" href="style.css?v=v1.4.20" />
 </head>
 <body>
   <div id="stage">
@@ -41,14 +41,17 @@
       <p class="hint">화면을 손가락으로 쓸어서 늑구를 좌우로 조종 · 사육사·그물을 피해 계속 북쪽으로!</p>
       <p class="hint" style="color:#ffb84a; font-style:italic;">…그 끝엔, 아무도 예상 못한 반전이 있다.</p>
       <button id="start-btn">탈출 시작!</button>
-      <p class="version">v1.4.19</p>
+      <p class="version">v1.4.20</p>
     </div>
     <div id="over-overlay" class="overlay hidden">
       <h2 id="over-title">잡혔다!</h2>
       <p id="over-sub" class="hint hidden"></p>
       <p id="final-score">점수 0</p>
       <p id="final-best">최고 0</p>
-      <button id="restart-btn">다시 탈출!</button>
+      <div class="btn-row">
+        <button id="restart-btn">다시 탈출!</button>
+        <button id="share-btn" class="btn-secondary">공유하기</button>
+      </div>
     </div>
     <div id="credits-overlay" class="overlay hidden">
       <div id="credits-scroll">
@@ -186,10 +189,13 @@
         <div class="cr-divider"></div>
         <p class="cr-disclaimer">이 작품에 등장하는 모든 인물·단체·지명은<br/>가상이며, 실제와 어떠한 연관도 없습니다.</p>
       </div>
-      <button id="credits-restart-btn">처음부터 다시</button>
+      <div class="btn-row">
+        <button id="credits-restart-btn">처음부터 다시</button>
+        <button id="credits-share-btn" class="btn-secondary">엔딩 자랑</button>
+      </div>
     </div>
    </div>
   </div>
-  <script src="game.js?v=v1.4.19"></script>
+  <script src="game.js?v=v1.4.20"></script>
 </body>
 </html>
