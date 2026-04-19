@@ -338,12 +338,15 @@ button:active {
   left: 50%;
   transform: translateX(-50%);
   z-index: 4;
-  gap: 10px;
+  gap: 8px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 #credits-restart-btn,
 #credits-share-btn {
-  padding: 14px 24px;
-  font-size: clamp(16px, 4vw, 22px);
+  padding: 12px 18px;
+  font-size: clamp(14px, 3.6vw, 20px);
   margin-top: 0;
+  white-space: nowrap;
 }
