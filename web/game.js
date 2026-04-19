@@ -2960,7 +2960,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.25";
+  const CURRENT_VERSION = "v1.4.26";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
