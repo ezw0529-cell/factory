@@ -366,7 +366,7 @@
     }
 
     // phase transition into boss
-    if (state.phase === "normal" && state.score >= BOSS_SCORE) {
+    if (state.phase === "normal" && Math.floor(state.distance / 25) >= BOSS_SCORE) {
       state.phase = "approach";
       state.phaseT = 0;
       state.bossAnnounce = 2.5;
