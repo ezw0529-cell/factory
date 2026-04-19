@@ -219,6 +219,52 @@ button:active {
   transform: translateX(-50%) translateY(0);
 }
 
+.update-banner {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%) translateY(16px);
+  background: rgba(15, 22, 35, 0.95);
+  border: 1px solid rgba(255, 216, 74, 0.45);
+  color: #fff;
+  padding: 8px 8px 8px 16px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 150;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  max-width: 90vw;
+}
+.update-banner.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.update-banner button {
+  margin: 0;
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 7px 14px;
+  border-radius: 999px;
+}
+.update-banner .update-reload {
+  background: #ffd84a;
+  color: #1a1a1a;
+}
+.update-banner .update-dismiss {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 18px;
+  padding: 2px 8px;
+  font-weight: 400;
+}
+
 #credits-overlay {
   background: radial-gradient(ellipse at top, #1a2a3e 0%, #05080f 90%);
   padding: 0;

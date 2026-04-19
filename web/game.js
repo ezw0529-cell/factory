@@ -2956,8 +2956,45 @@
         audio.startBgm(hiddenTrack);
       }
       hiddenTrack = null;
+      checkVersion();
     }
   });
+
+  const CURRENT_VERSION = "v1.4.25";
+  let updateBannerShown = false;
+  async function checkVersion() {
+    if (updateBannerShown) return;
+    try {
+      const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) return;
+      const data = await r.json();
+      if (data && data.version && data.version !== CURRENT_VERSION) {
+        showUpdateBanner();
+      }
+    } catch (e) { /* offline — ignore */ }
+  }
+  function showUpdateBanner() {
+    if (updateBannerShown) return;
+    updateBannerShown = true;
+    const b = document.createElement("div");
+    b.className = "update-banner";
+    b.innerHTML = '<span>🎉 새 버전이 나왔어요</span>' +
+      '<button class="update-reload">새로고침</button>' +
+      '<button class="update-dismiss" aria-label="닫기">×</button>';
+    document.body.appendChild(b);
+    b.querySelector(".update-reload").addEventListener("click", (e) => {
+      e.stopPropagation();
+      location.reload();
+    });
+    b.querySelector(".update-dismiss").addEventListener("click", (e) => {
+      e.stopPropagation();
+      b.classList.remove("show");
+      setTimeout(() => b.remove(), 300);
+    });
+    requestAnimationFrame(() => b.classList.add("show"));
+  }
+  setTimeout(checkVersion, 60_000);
+  setInterval(checkVersion, 5 * 60_000);
 
   document.getElementById("start-btn").addEventListener("click", (e) => {
     e.stopPropagation();
