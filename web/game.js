@@ -23,6 +23,221 @@
   const STEER_SPEED = 1800;
 
   const BEST_KEY = "neukgurun.best";
+  const MUTE_KEY = "neukgurun.muted";
+
+  // --- audio (Web Audio API — 보수적 볼륨, 사용자 놀라지 않게) ---
+  const audio = (() => {
+    let ctx = null;
+    let master = null;
+    let musicGain = null;
+    let sfxGain = null;
+    let muted = localStorage.getItem(MUTE_KEY) === "1";
+    let bgmTimer = null;
+    let bgmStep = 0;
+    let bgmTrack = null;
+
+    const MASTER_VOL = 0.32; // 전체 캡: 부드럽게
+    const MUSIC_VOL = 0.55;  // 음악은 배경으로
+    const SFX_VOL = 1.0;
+
+    function ensure() {
+      if (!ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        ctx = new AC();
+        master = ctx.createGain();
+        master.gain.value = muted ? 0 : MASTER_VOL;
+        master.connect(ctx.destination);
+        sfxGain = ctx.createGain();
+        sfxGain.gain.value = SFX_VOL;
+        sfxGain.connect(master);
+        musicGain = ctx.createGain();
+        musicGain.gain.value = 0;
+        musicGain.connect(master);
+      }
+      if (ctx.state === "suspended") ctx.resume();
+      return ctx;
+    }
+
+    function isMuted() { return muted; }
+    function setMuted(v) {
+      muted = !!v;
+      localStorage.setItem(MUTE_KEY, muted ? "1" : "0");
+      if (master) master.gain.value = muted ? 0 : MASTER_VOL;
+    }
+
+    function tone(freq, dur, opts) {
+      if (!ctx) return;
+      opts = opts || {};
+      const t0 = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = opts.type || "sine";
+      osc.frequency.setValueAtTime(freq, t0);
+      if (opts.slideTo) {
+        osc.frequency.exponentialRampToValueAtTime(Math.max(20, opts.slideTo), t0 + dur);
+      }
+      const vol = opts.vol != null ? opts.vol : 0.15;
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(vol, t0 + (opts.attack || 0.01));
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      osc.connect(g);
+      g.connect(opts.bus || sfxGain);
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.05);
+    }
+
+    function noise(dur, opts) {
+      if (!ctx) return;
+      opts = opts || {};
+      const t0 = ctx.currentTime;
+      const bufSize = Math.max(1, Math.floor(ctx.sampleRate * dur));
+      const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < bufSize; i++) d[i] = Math.random() * 2 - 1;
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const filt = ctx.createBiquadFilter();
+      filt.type = opts.filterType || "lowpass";
+      filt.frequency.value = opts.filterFreq || 800;
+      const g = ctx.createGain();
+      const vol = opts.vol != null ? opts.vol : 0.12;
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(vol, t0 + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      src.connect(filt); filt.connect(g); g.connect(opts.bus || sfxGain);
+      src.start(t0);
+      src.stop(t0 + dur + 0.05);
+    }
+
+    function kick(when, vol) {
+      if (!ctx) return;
+      vol = vol != null ? vol : 0.1;
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(120, when);
+      osc.frequency.exponentialRampToValueAtTime(40, when + 0.09);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(vol, when);
+      g.gain.exponentialRampToValueAtTime(0.001, when + 0.14);
+      osc.connect(g);
+      g.connect(musicGain);
+      osc.start(when);
+      osc.stop(when + 0.2);
+    }
+
+    const sfx = {
+      pickup() {
+        tone(784, 0.08, { type: "triangle", vol: 0.14 });
+        setTimeout(() => tone(1175, 0.12, { type: "triangle", vol: 0.14 }), 55);
+      },
+      net() {
+        tone(220, 0.22, { type: "sawtooth", slideTo: 110, vol: 0.1 });
+        noise(0.18, { filterFreq: 500, vol: 0.07 });
+      },
+      dart() {
+        tone(900, 0.08, { type: "square", slideTo: 660, vol: 0.12 });
+        noise(0.05, { filterType: "highpass", filterFreq: 3000, vol: 0.08 });
+      },
+      gorani() {
+        tone(140, 0.22, { type: "sawtooth", slideTo: 80, vol: 0.14 });
+        noise(0.2, { filterFreq: 1200, vol: 0.12 });
+      },
+      tanker() {
+        tone(70, 0.5, { type: "triangle", slideTo: 45, vol: 0.18 });
+        noise(0.45, { filterFreq: 280, vol: 0.1 });
+      },
+      twist() {
+        tone(523, 0.5, { type: "sine", slideTo: 196, vol: 0.16 });
+      },
+      bossWarn() {
+        tone(660, 0.1, { type: "square", vol: 0.12 });
+        setTimeout(() => tone(660, 0.1, { type: "square", vol: 0.12 }), 180);
+        setTimeout(() => tone(880, 0.22, { type: "square", vol: 0.12 }), 360);
+      },
+      gameOver() {
+        tone(349, 0.14, { type: "sawtooth", vol: 0.14 });
+        setTimeout(() => tone(294, 0.14, { type: "sawtooth", vol: 0.14 }), 140);
+        setTimeout(() => tone(220, 0.34, { type: "sawtooth", vol: 0.14 }), 280);
+      },
+      victory() {
+        tone(523, 0.12, { type: "triangle", vol: 0.16 });
+        setTimeout(() => tone(659, 0.12, { type: "triangle", vol: 0.16 }), 110);
+        setTimeout(() => tone(784, 0.12, { type: "triangle", vol: 0.16 }), 220);
+        setTimeout(() => tone(1047, 0.3, { type: "triangle", vol: 0.18 }), 330);
+      },
+      tap() {
+        tone(520, 0.04, { type: "square", vol: 0.08 });
+      },
+    };
+
+    // --- BGM 단순 스텝 시퀀서 ---
+    const patterns = {
+      normal: {
+        bpm: 116,
+        bass: [131, 131, 175, 175, 196, 196, 131, 175],
+        lead: [523, 659, 784, 659, 698, 784, 659, 523],
+        kick: [1, 0, 0, 0, 1, 0, 0, 0],
+      },
+      boss: {
+        bpm: 130,
+        bass: [110, 110, 131, 131, 98, 98, 110, 110],
+        lead: [440, 523, 659, 523, 494, 523, 440, 392],
+        kick: [1, 0, 1, 0, 1, 0, 1, 0],
+      },
+      victory: {
+        bpm: 104,
+        bass: [196, 262, 330, 262, 196, 220, 294, 392],
+        lead: [784, 988, 1175, 988, 784, 880, 1047, 1319],
+        kick: [1, 0, 0, 0, 1, 0, 0, 0],
+      },
+    };
+
+    function bgmTick() {
+      if (!ctx || !bgmTrack) return;
+      const p = patterns[bgmTrack];
+      if (!p) return;
+      const step = bgmStep % p.bass.length;
+      tone(p.bass[step], 0.34, { type: "triangle", vol: 0.055, bus: musicGain, attack: 0.02 });
+      tone(p.lead[step], 0.2, { type: "square", vol: 0.028, bus: musicGain, attack: 0.02 });
+      if (p.kick[step]) kick(ctx.currentTime + 0.02, 0.07);
+      bgmStep++;
+    }
+
+    function startBgm(track) {
+      ensure();
+      if (!ctx) return;
+      if (bgmTrack === track) return;
+      stopBgm(false);
+      bgmTrack = track;
+      bgmStep = 0;
+      const t0 = ctx.currentTime;
+      musicGain.gain.cancelScheduledValues(t0);
+      musicGain.gain.setValueAtTime(musicGain.gain.value, t0);
+      musicGain.gain.linearRampToValueAtTime(MUSIC_VOL, t0 + 1.2);
+      const p = patterns[track];
+      const stepMs = (60 / p.bpm) * 1000 / 2;
+      bgmTick();
+      bgmTimer = setInterval(bgmTick, stepMs);
+    }
+
+    function stopBgm(fade) {
+      if (bgmTimer) { clearInterval(bgmTimer); bgmTimer = null; }
+      bgmTrack = null;
+      if (ctx && musicGain) {
+        const t0 = ctx.currentTime;
+        musicGain.gain.cancelScheduledValues(t0);
+        musicGain.gain.setValueAtTime(musicGain.gain.value, t0);
+        if (fade !== false) {
+          musicGain.gain.linearRampToValueAtTime(0, t0 + 0.4);
+        } else {
+          musicGain.gain.setValueAtTime(0, t0 + 0.02);
+        }
+      }
+    }
+
+    return { ensure, isMuted, setMuted, sfx, startBgm, stopBgm };
+  })();
 
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
@@ -207,6 +422,8 @@
     state.running = true;
     startOverlay.classList.add("hidden");
     overOverlay.classList.add("hidden");
+    audio.ensure();
+    audio.startBgm("normal");
     state.lastT = performance.now();
     requestAnimationFrame(loop);
   }
@@ -214,6 +431,13 @@
   function gameOver(reason) {
     state.running = false;
     state.shake = 28;
+    audio.stopBgm();
+    if (reason === "net") audio.sfx.net();
+    else if (reason === "dart") audio.sfx.dart();
+    else if (reason === "gorani") audio.sfx.gorani();
+    else if (reason === "tanker") audio.sfx.tanker();
+    else if (reason === "male") audio.sfx.twist();
+    else audio.sfx.gameOver();
     if (state.score > state.best) {
       state.best = state.score;
       localStorage.setItem(BEST_KEY, String(state.best));
@@ -254,6 +478,8 @@
 
   function victory() {
     state.running = false;
+    audio.sfx.victory();
+    audio.startBgm("victory");
     if (state.score > state.best) {
       state.best = state.score;
       localStorage.setItem(BEST_KEY, String(state.best));
@@ -466,6 +692,8 @@
       state.phase = "approach";
       state.phaseT = 0;
       state.bossAnnounce = 2.5;
+      audio.sfx.bossWarn();
+      audio.startBgm("boss");
       // clear any land obstacles — the world changes to the strait
       state.obstacles = [];
       state.bullets = [];
@@ -624,6 +852,7 @@
           scoreEl.textContent = "점수 " + state.score;
           state.scoreFloats.push({ x: o.x + o.w / 2, y: o.y + o.h / 2, t: 0, text: "+100" });
           state.obstacles.splice(i, 1);
+          audio.sfx.pickup();
           i--;
           continue;
         } else if (o.type === 6) {
@@ -2629,16 +2858,36 @@
 
   document.getElementById("start-btn").addEventListener("click", (e) => {
     e.stopPropagation();
+    audio.ensure();
+    audio.sfx.tap();
     start();
   });
   document.getElementById("restart-btn").addEventListener("click", (e) => {
     e.stopPropagation();
+    audio.ensure();
+    audio.sfx.tap();
     start();
   });
   document.getElementById("credits-restart-btn").addEventListener("click", (e) => {
     e.stopPropagation();
+    audio.ensure();
+    audio.sfx.tap();
     creditsOverlay.classList.add("hidden");
     start();
+  });
+
+  const muteBtn = document.getElementById("mute-btn");
+  function refreshMuteIcon() {
+    muteBtn.textContent = audio.isMuted() ? "🔇" : "🔊";
+  }
+  refreshMuteIcon();
+  muteBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    audio.ensure();
+    const nextMuted = !audio.isMuted();
+    audio.setMuted(nextMuted);
+    refreshMuteIcon();
+    if (!nextMuted) audio.sfx.tap();
   });
 
   state.scenery = seedScenery();
