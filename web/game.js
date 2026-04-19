@@ -1,4 +1,18 @@
 (() => {
+  // 프리뷰/개발 환경 식별 — 호스트가 운영 도메인이 아니면 배지 + 탭 제목 표시
+  const PROD_HOST = "neukgu-run.pages.dev";
+  if (typeof window !== "undefined" && window.location.hostname !== PROD_HOST) {
+    const badge = document.createElement("div");
+    badge.className = "preview-badge";
+    badge.textContent = "🚧 PREVIEW";
+    if (document.body) {
+      document.body.appendChild(badge);
+    } else {
+      document.addEventListener("DOMContentLoaded", () => document.body.appendChild(badge));
+    }
+    document.title = "[PREVIEW] " + document.title;
+  }
+
   const W = 720;
   const H = 1280;
 
@@ -2975,7 +2989,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.30";
+  const CURRENT_VERSION = "v1.4.31";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;

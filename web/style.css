@@ -263,6 +263,23 @@ button:active {
   font-weight: 400;
 }
 
+.preview-badge {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top, 0px));
+  left: 10px;
+  background: #c0322a;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 5px 10px;
+  border-radius: 999px;
+  z-index: 200;
+  letter-spacing: 1.2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
 #credits-overlay {
   background: radial-gradient(ellipse at top, #1a2a3e 0%, #05080f 90%);
   padding: 0;
