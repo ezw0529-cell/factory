@@ -37,7 +37,7 @@
   const creditsOverlay = document.getElementById("credits-overlay");
   const creditsScroll = document.getElementById("credits-scroll");
 
-  const BOSS_SCORE = 640;
+  const BOSS_DIST = 24000;
   const INTRO_DURATION = 3.2;
 
   const state = {
@@ -462,7 +462,7 @@
     }
 
     // phase transition into boss
-    if (state.phase === "normal" && Math.floor(state.distance / 25) >= BOSS_SCORE) {
+    if (state.phase === "normal" && state.distance >= BOSS_DIST) {
       state.phase = "approach";
       state.phaseT = 0;
       state.bossAnnounce = 2.5;
