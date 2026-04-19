@@ -113,7 +113,23 @@
     const w = 200;
     const h = 460;
     const x = side === "L" ? -60 : W - w + 60;  // extends past the sidewalk
-    state.scenery.push({ kind: "sungsimdang_big", x, y: -h - 40, w, h, label: null });
+    const y = -h - 40;
+    state.scenery.push({ kind: "sungsimdang_big", x, y, w, h, label: null });
+    // place 3 튀김소보로 bonuses on the road right next to the bakery (stacked vertically)
+    const bw = 80, bh = 80;
+    const bx = side === "L"
+      ? x + w + 30                     // right edge of left-side bakery → into road
+      : x - bw - 30;                   // left edge of right-side bakery → into road
+    const bxClamped = Math.max(PLAYER_MARGIN, Math.min(W - PLAYER_MARGIN - bw, bx));
+    for (let i = 0; i < 3; i++) {
+      state.obstacles.push({
+        type: 5, sub: "bread",
+        x: bxClamped,
+        y: y + 120 + i * 140,
+        w: bw, h: bh,
+        passed: false, phase: Math.random() * Math.PI * 2,
+      });
+    }
   }
 
   function spawnStadium() {
@@ -324,18 +340,6 @@
     if (!state.sungsimdangSpawned && state.phase === "normal" && state.distance > 2600) {
       state.sungsimdangSpawned = true;
       spawnSungsimdang();
-      // 성심당 옆에 빵 보너스 3개 연속으로 떨어뜨림
-      state.breadDropQueue = 3;
-      state.breadDropTimer = 1.2;
-    }
-    // drop bread items after 성심당
-    if (state.breadDropQueue > 0) {
-      state.breadDropTimer -= dt;
-      if (state.breadDropTimer <= 0) {
-        spawnBonus("bread");
-        state.breadDropQueue -= 1;
-        state.breadDropTimer = 0.9 + Math.random() * 0.3;
-      }
     }
     // one-time female wolf trap (looks like bonus — but actually a trap)
     if (!state.femaleSpawned && state.phase === "normal" && state.distance > 5000) {
