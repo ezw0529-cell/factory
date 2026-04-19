@@ -235,6 +235,14 @@
       overTitleEl.textContent = "마취탄 명중";
       overSubEl.textContent = "수의사의 정조준을 피하지 못했다.";
       overSubEl.classList.remove("hidden");
+    } else if (reason === "gorani") {
+      overTitleEl.textContent = "고라니와 충돌!";
+      overSubEl.textContent = "도로 위 또 다른 탈주자에게 받혔다.";
+      overSubEl.classList.remove("hidden");
+    } else if (reason === "tanker") {
+      overTitleEl.textContent = "유조선에 부딪혔다!";
+      overSubEl.textContent = "해협의 교통량이 만만치 않다.";
+      overSubEl.classList.remove("hidden");
     } else {
       overTitleEl.textContent = "잡혔다!";
       overSubEl.classList.add("hidden");
@@ -605,6 +613,12 @@
           state.obstacles.splice(i, 1);
           i--;
           continue;
+        } else if (o.type === 6) {
+          gameOver("gorani");
+          return;
+        } else if (o.type === 4) {
+          gameOver("tanker");
+          return;
         } else {
           gameOver();
           return;
