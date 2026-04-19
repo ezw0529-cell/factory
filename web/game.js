@@ -17,6 +17,9 @@
   const SPAWN_MIN = 1.35;
   const SPAWN_MAX = 2.60;
 
+  const NET_UNLOCK_DIST = 4000;   // 25% — 포획반(그물) 등장
+  const VET_UNLOCK_DIST = 8000;   // 50% — 수의사(마취총) 등장
+
   const STEER_SPEED = 1800;
 
   const BEST_KEY = "neukgurun.best";
@@ -266,30 +269,33 @@
   }
 
   // --- spawning ---
-  // obstacles: 0 = person (zookeeper/vet), 3 = "female" wolf (twist), 4 = tanker, 5 = bonus, 6 = gorani
-  const PERSON_KINDS = ["zookeeper", "vet"];
+  // obstacles: 0 = person (zookeeper/capture/vet), 3 = female-wolf twist, 4 = tanker, 5 = bonus, 6 = gorani
   function spawnObstacle() {
     const type = 0;
     const w = 110, h = 150;
-    const sub = PERSON_KINDS[Math.floor(Math.random() * PERSON_KINDS.length)];
+
+    // 등장 캐릭터는 거리에 따라 다름
+    let sub;
+    const r = Math.random();
+    if (state.distance < NET_UNLOCK_DIST) {
+      sub = "zookeeper";
+    } else if (state.distance < VET_UNLOCK_DIST) {
+      sub = r < 0.55 ? "zookeeper" : "capture";
+    } else {
+      if (r < 0.30) sub = "zookeeper";
+      else if (r < 0.75) sub = "capture";
+      else sub = "vet";
+    }
+
     const x = pickSpawnX(w);
     if (x === null) return;
     const o = { type, sub, x, y: -h - 40, w, h, passed: false, phase: Math.random() * Math.PI * 2 };
-    // ranged attacks — 초반엔 순수 회피, 거리 쌓이면 점차 활성화
-    let throwChance = 0;
-    if (state.distance > 3000) {
-      const rt = Math.min(1, (state.distance - 3000) / 4000);
-      throwChance = 0.35 + 0.3 * rt;
-    }
-    if (throwChance > 0 && Math.random() < throwChance) {
-      let kind = null;
-      if (sub === "zookeeper") kind = "net";
-      else if (sub === "vet") kind = "dart";
-      if (kind) {
-        o.throws = kind;
-        o.thrown = false;
-        o.throwAtY = 180 + Math.random() * 180;
-      }
+
+    // 투척은 역할 기반 — 사육사는 안 쏨, 포획반은 그물, 수의사는 마취총
+    if (sub === "capture") {
+      o.throws = "net"; o.thrown = false; o.throwAtY = 180 + Math.random() * 180;
+    } else if (sub === "vet") {
+      o.throws = "dart"; o.thrown = false; o.throwAtY = 180 + Math.random() * 180;
     }
     state.obstacles.push(o);
   }
@@ -1410,11 +1416,16 @@
     const cx = o.x + o.w / 2;
     const y = o.y;
     const h = o.h;
+
+    // 역할별 팔레트
     let uniform = "#7a6a3e", cap = "#4a5c2e", accent = "#d4c18b";
-    const label = null;
-    if (o.sub === "vet") {
-      uniform = "#f0f4f6"; cap = "#d8dfe2"; accent = "#2a9a88";
+    let handColor = "#f2c29b";
+    if (o.sub === "capture") {
+      uniform = "#2e3a26"; cap = "#0f1410"; accent = "#c22820"; handColor = "#151515";
+    } else if (o.sub === "vet") {
+      uniform = "#d6dde3"; cap = "#1a1f24"; accent = "#b8222a"; handColor = "#2a2a2a";
     }
+
     // shadow
     ctx.fillStyle = "rgba(0,0,0,0.25)";
     ctx.beginPath();
@@ -1430,58 +1441,99 @@
     // belt
     ctx.fillStyle = "#1a1a1a";
     ctx.fillRect(cx - o.w * 0.4, y + h * 0.65, o.w * 0.8, 6);
-    // arms extended (trying to catch)
+    // arms extended
     ctx.fillStyle = uniform;
     roundRect(cx - o.w * 0.58, y + h * 0.32, 18, h * 0.35, 8); ctx.fill();
     roundRect(cx + o.w * 0.58 - 18, y + h * 0.32, 18, h * 0.35, 8); ctx.fill();
     // hands
-    ctx.fillStyle = "#f2c29b";
+    ctx.fillStyle = handColor;
     ctx.beginPath();
     ctx.arc(cx - o.w * 0.58 + 9, y + h * 0.67, 10, 0, Math.PI * 2);
     ctx.arc(cx + o.w * 0.58 - 9, y + h * 0.67, 10, 0, Math.PI * 2);
     ctx.fill();
-    // chest label badge
-    if (label) {
+
+    // 역할별 가슴 디테일
+    if (o.sub === "capture") {
+      // 붉은 전술 벨트
       ctx.fillStyle = accent;
-      roundRect(cx - 22, y + h * 0.42, 44, 16, 3); ctx.fill();
-      ctx.fillStyle = "#1a1a1a";
-      ctx.font = "bold 11px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(label, cx, y + h * 0.42 + 12);
+      ctx.fillRect(cx - o.w * 0.4, y + h * 0.46, o.w * 0.8, 6);
+      // 어깨 가로지르는 포획망 감김
+      ctx.strokeStyle = "#6b4820"; ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(cx - o.w * 0.42, y + h * 0.34);
+      ctx.lineTo(cx + o.w * 0.42, y + h * 0.58);
+      ctx.stroke();
+      ctx.strokeStyle = "#3a2610"; ctx.lineWidth = 1.5;
+      ctx.stroke();
+    } else if (o.sub === "vet") {
+      // 적십자 배지
+      ctx.fillStyle = accent;
+      ctx.fillRect(cx - 4, y + h * 0.40, 8, 22);
+      ctx.fillRect(cx - 11, y + h * 0.46, 22, 10);
     }
+
     // head
     ctx.fillStyle = "#f2c29b";
     ctx.beginPath();
     ctx.arc(cx, y + h * 0.2, 22, 0, Math.PI * 2);
     ctx.fill();
-    // cap
+
+    // cap / helmet
     ctx.fillStyle = cap;
     ctx.beginPath();
     ctx.arc(cx, y + h * 0.14, 22, Math.PI, 0);
     ctx.fill();
     ctx.fillRect(cx - 22, y + h * 0.14, 44, 6);
-    // cap brim
     ctx.fillStyle = "#111";
     ctx.fillRect(cx - 26, y + h * 0.14 + 4, 52, 4);
-    // cap emblem
-    ctx.fillStyle = accent;
-    ctx.beginPath();
-    ctx.arc(cx, y + h * 0.08, 4, 0, Math.PI * 2);
-    ctx.fill();
-    // eyes
-    ctx.fillStyle = "#1a1a1a";
-    ctx.beginPath();
-    ctx.arc(cx - 6, y + h * 0.22, 2, 0, Math.PI * 2);
-    ctx.arc(cx + 6, y + h * 0.22, 2, 0, Math.PI * 2);
-    ctx.fill();
-    // mouth (determined line)
-    ctx.strokeStyle = "#1a1a1a"; ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(cx - 5, y + h * 0.26);
-    ctx.lineTo(cx + 5, y + h * 0.26);
-    ctx.stroke();
-    // vet-only: stethoscope draped over shoulders
-    if (o.sub === "vet") {
+
+    if (o.sub === "zookeeper") {
+      // 노란 엠블럼
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.arc(cx, y + h * 0.08, 4, 0, Math.PI * 2);
+      ctx.fill();
+      // 눈
+      ctx.fillStyle = "#1a1a1a";
+      ctx.beginPath();
+      ctx.arc(cx - 6, y + h * 0.22, 2, 0, Math.PI * 2);
+      ctx.arc(cx + 6, y + h * 0.22, 2, 0, Math.PI * 2);
+      ctx.fill();
+      // 입
+      ctx.strokeStyle = "#1a1a1a"; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx - 5, y + h * 0.26);
+      ctx.lineTo(cx + 5, y + h * 0.26);
+      ctx.stroke();
+    } else if (o.sub === "capture") {
+      // 헬멧 상단 붉은 밴드
+      ctx.fillStyle = accent;
+      ctx.fillRect(cx - 22, y + h * 0.115, 44, 4);
+      // 바이저
+      ctx.fillStyle = "#0a0a0a";
+      ctx.fillRect(cx - 20, y + h * 0.19, 40, 8);
+      // 턱끈 느낌의 스트로크
+      ctx.strokeStyle = "#333"; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, y + h * 0.2, 22, 0.1 * Math.PI, 0.9 * Math.PI, false);
+      ctx.stroke();
+    } else if (o.sub === "vet") {
+      // 다크 고글
+      ctx.fillStyle = "#0a0a0a";
+      ctx.fillRect(cx - 18, y + h * 0.20, 36, 7);
+      // 수술용 마스크
+      ctx.fillStyle = "#c2c8cc";
+      roundRect(cx - 14, y + h * 0.24, 28, 10, 3); ctx.fill();
+      ctx.strokeStyle = "#888"; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx - 14, y + h * 0.28);
+      ctx.lineTo(cx + 14, y + h * 0.28);
+      ctx.stroke();
+      // 캡 적십자 포인트
+      ctx.fillStyle = accent;
+      ctx.fillRect(cx - 2, y + h * 0.06, 4, 10);
+      ctx.fillRect(cx - 5, y + h * 0.09, 10, 4);
+      // 청진기
       ctx.strokeStyle = "#1a1a1a"; ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(cx - 18, y + h * 0.34);
