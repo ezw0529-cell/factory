@@ -463,11 +463,11 @@
   }
 
   function spawnHanbit() {
-    // 한빛탑 — 아담하고 귀여운 버전
+    // 한빛탑 — 아담하고 귀여운 버전 (잘 보이도록 크기 +, 인도 안쪽으로 살짝 배치)
     const side = Math.random() < 0.5 ? "L" : "R";
-    const w = 96;
-    const h = 260;
-    const x = side === "L" ? -8 : W - w + 8;
+    const w = 140;
+    const h = 340;
+    const x = side === "L" ? 16 : W - w - 16;
     const y = -h - 40;
     state.scenery.push({ kind: "hanbit_big", x, y, w, h, side });
   }
@@ -621,11 +621,11 @@
     const o = { type, sub, x, y: -h - 40, w, h, passed: false, phase: Math.random() * Math.PI * 2 };
 
     // 투척은 역할 기반 — 사육사는 안 쏨, 포획반은 그물, 수의사는 마취총
-    // 투척 위치를 뒤로 미뤄서(몹이 화면 상단에 충분히 내려왔을 때) 탄이 몹에 뒤처져 보이는 문제 완화
+    // 몹이 화면 상단에 등장하자마자 즉시 던져서, 탄이 몹 뒤에 남아 "제자리에 멈춘" 것처럼 보이는 문제를 방지
     if (sub === "capture") {
-      o.throws = "net"; o.thrown = false; o.throwAtY = 340 + Math.random() * 180;
+      o.throws = "net"; o.thrown = false; o.throwAtY = 20 + Math.random() * 100;
     } else if (sub === "vet") {
-      o.throws = "dart"; o.thrown = false; o.throwAtY = 340 + Math.random() * 180;
+      o.throws = "dart"; o.thrown = false; o.throwAtY = 20 + Math.random() * 100;
     }
     state.obstacles.push(o);
   }
@@ -1844,20 +1844,23 @@
     ctx.ellipse(cx, baseY - 4, s.w * 0.5, 8, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // 둥근 돌 베이스 — 짙은 그레이로 바닥과 대비
+    // 둥근 돌 베이스 — 원래의 natural stone 톤 + 진한 외곽선
     const baseW = s.w * 0.82;
     const baseH = 20;
-    ctx.fillStyle = "#4a4238";
+    ctx.fillStyle = "#8a7c66";
     roundRect(cx - baseW / 2, baseY - baseH, baseW, baseH, 6); ctx.fill();
-    ctx.fillStyle = "#6a6256";
+    ctx.strokeStyle = "#2a2218";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = "#a69780";
     ctx.fillRect(cx - baseW / 2 + 4, baseY - baseH + 3, baseW - 8, 2);
 
-    // 통통한 샤프트 — 살구색(한빛탑 실제 톤)으로 바탕과 대비
+    // 통통한 샤프트 — cream 톤 유지, 외곽선만 진하게
     const shaftBottomW = s.w * 0.38;
     const shaftTopW = s.w * 0.26;
     const shaftBottomY = baseY - baseH;
     const shaftTopY = topY + s.h * 0.34;
-    ctx.fillStyle = "#e89d6e";
+    ctx.fillStyle = "#dcd4c4";
     ctx.beginPath();
     ctx.moveTo(cx - shaftBottomW / 2, shaftBottomY);
     ctx.lineTo(cx + shaftBottomW / 2, shaftBottomY);
@@ -1865,52 +1868,54 @@
     ctx.lineTo(cx - shaftTopW / 2, shaftTopY);
     ctx.closePath();
     ctx.fill();
-    // 샤프트 외곽선으로 실루엣 강조
-    ctx.strokeStyle = "#7a3a18";
+    ctx.strokeStyle = "#2a2218";
     ctx.lineWidth = 2;
     ctx.stroke();
     // 샤프트 오른쪽 음영
-    ctx.fillStyle = "rgba(120,40,10,0.25)";
+    ctx.fillStyle = "rgba(0,0,0,0.14)";
     ctx.fillRect(cx + shaftTopW / 2 - 3, shaftTopY, 3, shaftBottomY - shaftTopY);
 
-    // 둥근 관측 포드 — 코발트 블루로 하늘과 배경에서 또렷이 보이게
+    // 둥근 관측 포드 — 원래의 metallic gray-blue + 진한 외곽선
     const podCy = shaftTopY - 2;
     const podW = s.w * 0.72;
     const podH = 22;
     // 아랫면
-    ctx.fillStyle = "#1f4a78";
+    ctx.fillStyle = "#9aa6b0";
     ctx.beginPath();
     ctx.ellipse(cx, podCy, podW / 2, podH * 0.45, 0, 0, Math.PI);
     ctx.fill();
+    ctx.strokeStyle = "#2a2a33";
+    ctx.lineWidth = 2;
+    ctx.stroke();
     // 본체
-    ctx.fillStyle = "#3a7ab8";
+    ctx.fillStyle = "#c7d2dc";
     ctx.beginPath();
     ctx.ellipse(cx, podCy - podH * 0.35, podW / 2, podH * 0.55, 0, 0, Math.PI * 2);
     ctx.fill();
-    // 포드 외곽선
-    ctx.strokeStyle = "#0f2a48";
-    ctx.lineWidth = 1.5;
     ctx.stroke();
     // 창문 띠
-    ctx.fillStyle = "#ffe060";
+    ctx.fillStyle = "#2a4a6a";
     const winCount = 5;
     const winSpacing = (podW - 20) / (winCount - 1);
     for (let i = 0; i < winCount; i++) {
       ctx.beginPath();
-      ctx.arc(cx - (podW - 20) / 2 + i * winSpacing, podCy - podH * 0.35, 2.8, 0, Math.PI * 2);
+      ctx.arc(cx - (podW - 20) / 2 + i * winSpacing, podCy - podH * 0.35, 2.5, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // 짧은 첨탑 — 짙은 금속색
+    // 짧은 첨탑 — 원래 실버톤 + 진한 외곽선
     const spireBottomY = podCy - podH * 0.8;
     const spireTopY = topY + 10;
-    ctx.fillStyle = "#3a4048";
+    ctx.fillStyle = "#a8b2bc";
     ctx.beginPath();
     ctx.moveTo(cx - 4, spireBottomY);
     ctx.lineTo(cx + 4, spireBottomY);
     ctx.lineTo(cx, spireTopY);
     ctx.closePath();
     ctx.fill();
+    ctx.strokeStyle = "#2a2a33";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
 
     // 끝에 동그란 빨간 램프 (큼직하게 귀엽게)
     const blink = (Math.floor(state.distance / 40) % 2) === 0;
@@ -2957,18 +2962,40 @@
     ctx.beginPath();
     ctx.ellipse(cx, y + b.h * 0.5, 80, 40, 0, 0, Math.PI * 2);
     ctx.fill();
+    // 이마 위쪽에만 살짝 얹는 금발 스윕 — 머리 외곽 안에서 클리핑해서 가발처럼 얹지 않음
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(cx, y + b.h * 0.4, 90, 72, 0, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.fillStyle = "#e8b95a";
+    ctx.beginPath();
+    ctx.moveTo(cx - 100, y + b.h * 0.32);
+    ctx.quadraticCurveTo(cx - 20, y + b.h * 0.36, cx + 40, y + b.h * 0.3);
+    ctx.quadraticCurveTo(cx + 80, y + b.h * 0.27, cx + 100, y + b.h * 0.26);
+    ctx.lineTo(cx + 100, y - 40);
+    ctx.lineTo(cx - 100, y - 40);
+    ctx.closePath();
+    ctx.fill();
+    // 앞머리 결 — 오른쪽으로 쓸리는 한 가닥 하이라이트
+    ctx.strokeStyle = "rgba(255, 232, 160, 0.55)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx - 60, y + b.h * 0.31);
+    ctx.quadraticCurveTo(cx, y + b.h * 0.28, cx + 70, y + b.h * 0.27);
+    ctx.stroke();
+    ctx.restore();
     // squint eyes
     ctx.strokeStyle = "#111";
     ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.moveTo(cx - 36, y + b.h * 0.38);
-    ctx.lineTo(cx - 18, y + b.h * 0.38);
-    ctx.moveTo(cx + 18, y + b.h * 0.38);
-    ctx.lineTo(cx + 36, y + b.h * 0.38);
+    ctx.moveTo(cx - 36, y + b.h * 0.42);
+    ctx.lineTo(cx - 18, y + b.h * 0.42);
+    ctx.moveTo(cx + 18, y + b.h * 0.42);
+    ctx.lineTo(cx + 36, y + b.h * 0.42);
     ctx.stroke();
     // mouth
     ctx.fillStyle = "#3a1f1f";
-    roundRect(cx - 18, y + b.h * 0.48, 36, 10, 4);
+    roundRect(cx - 18, y + b.h * 0.5, 36, 10, 4);
     ctx.fill();
     // arms out (blocking)
     ctx.fillStyle = "#1b2a48";
@@ -3462,7 +3489,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.44";
+  const CURRENT_VERSION = "v1.4.45";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
