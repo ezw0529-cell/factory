@@ -167,6 +167,13 @@
         setTimeout(() => tone(660, 0.1, { type: "square", vol: 0.12 }), 180);
         setTimeout(() => tone(880, 0.22, { type: "square", vol: 0.12 }), 360);
       },
+      siren() {
+        // 짧은 사이렌 — 주파수 위아래 스윕을 두 번 반복
+        tone(520, 0.22, { type: "sawtooth", slideTo: 880, vol: 0.12 });
+        setTimeout(() => tone(880, 0.22, { type: "sawtooth", slideTo: 520, vol: 0.12 }), 220);
+        setTimeout(() => tone(520, 0.22, { type: "sawtooth", slideTo: 880, vol: 0.12 }), 440);
+        setTimeout(() => tone(880, 0.26, { type: "sawtooth", slideTo: 520, vol: 0.12 }), 660);
+      },
       gameOver() {
         tone(349, 0.14, { type: "sawtooth", vol: 0.14 });
         setTimeout(() => tone(294, 0.14, { type: "sawtooth", vol: 0.14 }), 140);
@@ -535,7 +542,7 @@
       overSubEl.classList.remove("hidden");
     } else if (reason === "money") {
       overTitleEl.textContent = "돈뭉치에 맞았다!";
-      overSubEl.textContent = "도람뿌의 압박에 길이 막혔다.";
+      overSubEl.textContent = "금권의 압박에 길이 막혔다.";
       overSubEl.classList.remove("hidden");
     } else if (reason === "trump") {
       overTitleEl.textContent = "최종 보스에게 잡혔다";
@@ -782,9 +789,10 @@
       state.phaseT += dt;
     }
     if (state.phase === "approach") {
-      // show phase 1 banner right at the start of approach
+      // 페이즈 1 시그널 배너 + 사이렌
       if (state.phaseT < dt * 2 && !state.bossBanner) {
-        showBossBanner("⚓ 해협 봉쇄", "이란이 호르무즈를 막아섰다", "warn", 2.6);
+        showBossBanner("⚓ 해협 봉쇄", "수문장이 해협을 틀어막았다", "warn", 2.8);
+        audio.sfx.siren();
       }
       if (state.phaseT >= 6.0) {
         state.phase = "boss";
@@ -861,8 +869,10 @@
       const BOSS_MIN_Y = 220, BOSS_MAX_Y = 520;
 
       if (b.transitionT > 0) {
-        // phase 1 → phase 2 hand-off
+        // 페이즈 1 → 페이즈 2 핸드오프: 수문장 퇴장 후 역봉쇄 시그널 깜빡깜빡 → 황금머리 입장
         b.transitionT -= dt;
+        // 페이즈 1 보스는 화면 밖으로 치워둠 (drawBoss 호출돼도 안 보임)
+        b.y = H + 400;
         if (b.transitionT <= 0) {
           b.bossPhase = 2;
           b.hp = 100;
@@ -873,7 +883,8 @@
           b.x = W / 2;
           b.vx = 200;
           b.vy = 80;
-          showBossBanner("💵 역봉쇄", "도람뿌, 돈으로 뚫는다!", "counter", 2.6);
+          b.dead = false;
+          b.deadT = 0;
         }
       } else if (!b.dead) {
         b.entryT += dt;
@@ -913,20 +924,20 @@
           b.fireTimer = b.bossPhase === 1 ? 1.05 : 0.9;
         }
 
-        // HP depleted → phase transition or victory
+        // HP 소진 → 두 보스 모두 쓰러지는 연출 먼저 (마리오식 스핀+낙하)
         if (b.hp <= 0) {
-          if (b.bossPhase === 1) {
-            b.transitionT = 1.8;
-            state.bullets = [];
-          } else {
-            b.dead = true;
-            b.deadT = 0;
+          b.dead = true;
+          b.deadT = 0;
+          state.bullets = [];
+          if (b.bossPhase === 2) {
             audio.sfx.victory();
             audio.startBgm("victory");
+          } else {
+            audio.sfx.bossFire();
           }
         }
       } else {
-        // mario-death sequence: brief hover then fast drop
+        // 마리오식 스핀+낙하
         b.deadT += dt;
         if (b.deadT < 0.35) {
           b.y -= 260 * dt;
@@ -934,12 +945,19 @@
           b.y += 1700 * dt * Math.min(1, (b.deadT - 0.35) * 3);
         }
         if (b.deadT > 0.85) {
-          state.phase = "outro";
-          state.outroT = 0;
-          state.boss = null;
-          state.bullets = [];
-          state.obstacles = [];
-          return;
+          if (b.bossPhase === 1) {
+            // 수문장 퇴장 완료 → 역봉쇄 시그널 깜박 후 황금머리 등장
+            b.transitionT = 3.0;
+            showBossBanner("💵 역봉쇄", "황금머리 등장 — 돈으로 뚫는다!", "counter", 2.8);
+            audio.sfx.siren();
+          } else {
+            state.phase = "outro";
+            state.outroT = 0;
+            state.boss = null;
+            state.bullets = [];
+            state.obstacles = [];
+            return;
+          }
         }
       }
     }
@@ -3036,44 +3054,41 @@
     ctx.beginPath();
     ctx.ellipse(cx, y + b.h * 0.5, 80, 40, 0, 0, Math.PI * 2);
     ctx.fill();
-    // signature combover — iconic swept-back pompadour with forward flop
+    // 금발 콤오버 — 한 덩어리로 그려서 투톤/가발 느낌 없애기
     const hairBase = "#e8b95a";
-    ctx.fillStyle = "#cc9838";
-    ctx.beginPath();
-    ctx.moveTo(cx - 100, y + b.h * 0.38);
-    ctx.quadraticCurveTo(cx - 118, y + 2, cx - 60, y - 18);
-    ctx.quadraticCurveTo(cx + 20, y - 26, cx + 100, y + 2);
-    ctx.quadraticCurveTo(cx + 122, y + b.h * 0.18, cx + 108, y + b.h * 0.34);
-    ctx.quadraticCurveTo(cx, y + b.h * 0.26, cx - 100, y + b.h * 0.38);
-    ctx.fill();
     ctx.fillStyle = hairBase;
     ctx.beginPath();
-    ctx.moveTo(cx - 92, y + b.h * 0.34);
-    ctx.quadraticCurveTo(cx - 106, y - 14, cx - 34, y - 30);
-    ctx.quadraticCurveTo(cx + 46, y - 30, cx + 88, y - 4);
-    ctx.quadraticCurveTo(cx + 110, y + b.h * 0.12, cx + 92, y + b.h * 0.26);
-    ctx.quadraticCurveTo(cx + 40, y + b.h * 0.2, cx - 20, y + b.h * 0.2);
-    ctx.quadraticCurveTo(cx - 70, y + b.h * 0.22, cx - 92, y + b.h * 0.34);
+    // 머리 실루엣: 왼쪽 귀밑에서 시작해 위로 부풀어 오르다 오른쪽으로 쓸어내리고 이마선으로 닫음
+    ctx.moveTo(cx - 88, y + b.h * 0.32);
+    // 왼쪽 측면 → 정수리 (솟아오른 크라운)
+    ctx.quadraticCurveTo(cx - 104, y - 2, cx - 50, y - 22);
+    // 정수리 → 오른쪽 꼭대기
+    ctx.quadraticCurveTo(cx + 20, y - 30, cx + 82, y - 12);
+    // 오른쪽 꼭대기 → 오른쪽 측면
+    ctx.quadraticCurveTo(cx + 112, y + b.h * 0.1, cx + 96, y + b.h * 0.3);
+    // 이마선 (앞으로 쓸려 내려온 뱅) — 오른쪽에서 시작해 왼쪽까지 부드럽게
+    ctx.quadraticCurveTo(cx + 70, y + b.h * 0.3, cx + 40, y + b.h * 0.26);
+    ctx.quadraticCurveTo(cx, y + b.h * 0.22, cx - 40, y + b.h * 0.28);
+    ctx.quadraticCurveTo(cx - 70, y + b.h * 0.3, cx - 88, y + b.h * 0.32);
+    ctx.closePath();
     ctx.fill();
+    // 크라운 하이라이트 — 같은 덩어리 위에 살짝 얹는 자연스러운 하이라이트
+    ctx.fillStyle = "#f5d278";
     ctx.beginPath();
-    ctx.moveTo(cx - 80, y + b.h * 0.3);
-    ctx.quadraticCurveTo(cx - 30, y + b.h * 0.08, cx + 40, y + b.h * 0.14);
-    ctx.quadraticCurveTo(cx + 86, y + b.h * 0.22, cx + 94, y + b.h * 0.32);
-    ctx.quadraticCurveTo(cx + 70, y + b.h * 0.3, cx + 30, y + b.h * 0.26);
-    ctx.quadraticCurveTo(cx - 30, y + b.h * 0.24, cx - 80, y + b.h * 0.3);
+    ctx.moveTo(cx - 30, y - 8);
+    ctx.quadraticCurveTo(cx + 20, y - 24, cx + 60, y - 10);
+    ctx.quadraticCurveTo(cx + 30, y + b.h * 0.04, cx - 10, y + b.h * 0.02);
+    ctx.quadraticCurveTo(cx - 30, y - 2, cx - 30, y - 8);
+    ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = "#f6d080";
+    // 이마선 아래 부드러운 그림자 (얼굴과 머리 경계를 자연스럽게)
+    ctx.strokeStyle = "rgba(120, 80, 20, 0.35)";
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(cx - 40, y + b.h * 0.04);
-    ctx.quadraticCurveTo(cx + 10, y - 18, cx + 60, y + b.h * 0.02);
-    ctx.quadraticCurveTo(cx + 20, y + b.h * 0.1, cx - 40, y + b.h * 0.04);
-    ctx.fill();
-    ctx.fillStyle = "rgba(120, 80, 20, 0.28)";
-    ctx.beginPath();
-    ctx.moveTo(cx - 74, y + b.h * 0.32);
-    ctx.quadraticCurveTo(cx, y + b.h * 0.28, cx + 90, y + b.h * 0.32);
-    ctx.quadraticCurveTo(cx, y + b.h * 0.31, cx - 74, y + b.h * 0.32);
-    ctx.fill();
+    ctx.moveTo(cx - 78, y + b.h * 0.32);
+    ctx.quadraticCurveTo(cx - 30, y + b.h * 0.3, cx + 30, y + b.h * 0.28);
+    ctx.quadraticCurveTo(cx + 70, y + b.h * 0.3, cx + 92, y + b.h * 0.32);
+    ctx.stroke();
     // squint eyes
     ctx.strokeStyle = "#111";
     ctx.lineWidth = 4;
@@ -3101,10 +3116,11 @@
   function drawBossAnnounce() {
     const bn = state.bossBanner;
     if (!bn) return;
-    // fade in 0.3s → hold → fade out 0.5s
-    const tIn = Math.min(1, bn.t / 0.3);
-    const tOut = Math.min(1, Math.max(0, (bn.total - bn.t) / 0.5));
-    const alpha = Math.min(tIn, tOut);
+    // 페이드 인/아웃 × 깜박임 (경보 시그널 느낌)
+    const tIn = Math.min(1, bn.t / 0.25);
+    const tOut = Math.min(1, Math.max(0, (bn.total - bn.t) / 0.4));
+    const blink = 0.6 + 0.4 * (Math.sin(bn.t * 10) > 0 ? 1 : 0); // 사각파 블링크
+    const alpha = Math.min(tIn, tOut) * blink;
     if (alpha <= 0) return;
 
     const theme = bn.theme;
@@ -3204,17 +3220,17 @@
   function drawBossHp() {
     const b = state.boss;
     if (!b || b.dead || b.transitionT > 0) return;
-    if (state.bossBanner && state.bossBanner.t < 1.0) return; // banner 겹침 방지
-    const barW = W - 160;
-    const barH = 22;
-    const barX = 80;
-    const barY = 110;
+    // 보스 머리 위에 떠 있는 HP바 — HUD/배경 배너와 겹치지 않음
+    const barW = b.w + 20;
+    const barH = 14;
+    const barX = b.x - barW / 2;
+    const barY = b.y - 34;
     // 배경
     ctx.fillStyle = "rgba(0,0,0,0.55)";
-    roundRect(barX - 6, barY - 6, barW + 12, barH + 12, 8); ctx.fill();
+    roundRect(barX - 4, barY - 4, barW + 8, barH + 8, 6); ctx.fill();
     // 틀
     ctx.fillStyle = "#15151a";
-    roundRect(barX, barY, barW, barH, 5); ctx.fill();
+    roundRect(barX, barY, barW, barH, 4); ctx.fill();
     // 체력 채움
     const ratio = Math.max(0, b.hp / b.hpMax);
     const fillW = Math.max(0, barW * ratio);
@@ -3228,21 +3244,20 @@
       fillGrad.addColorStop(1, "#d08a10");
     }
     ctx.fillStyle = fillGrad;
-    roundRect(barX, barY, fillW, barH, 5); ctx.fill();
+    roundRect(barX, barY, fillW, barH, 4); ctx.fill();
     // 하이라이트
     ctx.fillStyle = "rgba(255,255,255,0.25)";
-    ctx.fillRect(barX + 2, barY + 2, Math.max(0, fillW - 4), 4);
-    // 라벨
+    ctx.fillRect(barX + 2, barY + 2, Math.max(0, fillW - 4), 3);
+    // 라벨 — 바 바로 위에 작은 글씨로
     ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 16px 'Apple SD Gothic Neo', sans-serif";
-    ctx.shadowColor = "rgba(0,0,0,0.7)";
-    ctx.shadowBlur = 4;
-    const label = phase1 ? "PHASE 1 · 이란" : "PHASE 2 · 도람뿌";
-    ctx.fillText(label, W / 2, barY + barH / 2);
-    ctx.shadowBlur = 0;
     ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 14px 'Apple SD Gothic Neo', sans-serif";
+    ctx.shadowColor = "rgba(0,0,0,0.8)";
+    ctx.shadowBlur = 4;
+    const label = phase1 ? "해협 수문장" : "황금머리";
+    ctx.fillText(label, b.x, barY - 6);
+    ctx.shadowBlur = 0;
   }
 
   function drawIntroBg() {
@@ -3579,7 +3594,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.36";
+  const CURRENT_VERSION = "v1.4.37";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
