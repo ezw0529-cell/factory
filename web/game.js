@@ -307,12 +307,14 @@
   const overSubEl = document.getElementById("over-sub");
   const creditsOverlay = document.getElementById("credits-overlay");
   const creditsScroll = document.getElementById("credits-scroll");
+  const pauseOverlay = document.getElementById("pause-overlay");
 
   const BOSS_DIST = 24000;
   const INTRO_DURATION = 3.2;
 
   const state = {
     running: false,
+    paused: false,
     lastT: 0,
     scroll: SCROLL_START,
     distance: 0,
@@ -481,8 +483,11 @@
   function start() {
     reset();
     state.running = true;
+    state.paused = false;
     startOverlay.classList.add("hidden");
     overOverlay.classList.add("hidden");
+    pauseOverlay.classList.add("hidden");
+    refreshPauseIcon();
     audio.ensure();
     audio.startBgm("normal");
     state.lastT = performance.now();
@@ -2846,6 +2851,11 @@
   }
 
   function loop(t) {
+    if (state.paused) {
+      state.lastT = t;
+      requestAnimationFrame(loop);
+      return;
+    }
     const dt = Math.min(0.033, (t - state.lastT) / 1000);
     state.lastT = t;
     update(dt);
@@ -2863,12 +2873,13 @@
 
   function onPointerDown(e) {
     e.preventDefault();
-    if (!state.running) return;
+    if (!state.running || state.paused) return;
     state.pointerActive = true;
     state.player.targetX = canvasXFromEvent(e);
   }
   function onPointerMove(e) {
     if (!state.pointerActive) return;
+    if (state.paused) return;
     e.preventDefault();
     state.player.targetX = canvasXFromEvent(e);
   }
@@ -2945,7 +2956,7 @@
       audio.suspend();
     } else {
       audio.resume();
-      if (hiddenTrack && state.running && !audio.isMuted()) {
+      if (hiddenTrack && state.running && !state.paused && !audio.isMuted()) {
         audio.startBgm(hiddenTrack);
       }
       hiddenTrack = null;
@@ -2953,7 +2964,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.33";
+  const CURRENT_VERSION = "v1.4.34";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
@@ -3029,6 +3040,45 @@
     audio.setMuted(nextMuted);
     refreshMuteIcon();
     if (!nextMuted) audio.sfx.tap();
+  });
+
+  const pauseBtn = document.getElementById("pause-btn");
+  function refreshPauseIcon() {
+    pauseBtn.textContent = state.paused ? "▶" : "⏸";
+  }
+  function pauseGame() {
+    if (!state.running || state.paused) return;
+    state.paused = true;
+    pausedTrack = audio.currentTrack();
+    audio.stopBgm();
+    audio.suspend();
+    pauseOverlay.classList.remove("hidden");
+    refreshPauseIcon();
+  }
+  function resumeGame() {
+    if (!state.paused) return;
+    state.paused = false;
+    audio.resume();
+    if (pausedTrack && !audio.isMuted()) audio.startBgm(pausedTrack);
+    pausedTrack = null;
+    pauseOverlay.classList.add("hidden");
+    state.lastT = performance.now();
+    refreshPauseIcon();
+  }
+  let pausedTrack = null;
+  refreshPauseIcon();
+  pauseBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!state.running) return;
+    audio.ensure();
+    audio.sfx.tap();
+    if (state.paused) resumeGame(); else pauseGame();
+  });
+  document.getElementById("resume-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    audio.ensure();
+    audio.sfx.tap();
+    resumeGame();
   });
 
   state.scenery = seedScenery();
