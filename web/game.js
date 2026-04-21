@@ -161,9 +161,6 @@
         tone(70, 0.5, { type: "triangle", slideTo: 45, vol: 0.18 });
         noise(0.45, { filterFreq: 280, vol: 0.1 });
       },
-      twist() {
-        tone(523, 0.5, { type: "sine", slideTo: 196, vol: 0.16 });
-      },
       bossWarn() {
         tone(660, 0.1, { type: "square", vol: 0.12 });
         setTimeout(() => tone(660, 0.1, { type: "square", vol: 0.12 }), 180);
@@ -342,14 +339,13 @@
     bullets: [],
     sungsimdangSpawned: false,
     stadiumSpawned: false,
-    femaleSpawned: false,
+    exitGateSpawned: false,
     breadDropQueue: 0, // number of bread items still to drop after the bakery
     breadDropTimer: 0,
     bonusTimer: 3.5,
     bonusPoints: 0,
     goraniTimer: 9.0,
     scoreFloats: [], // { x, y, t, text }
-    reveal: null, // { x, y, t } when "암컷 → 수컷" flip is playing
   };
 
   bestEl.textContent = "최고 " + state.best;
@@ -437,6 +433,13 @@
     }
   }
 
+  function spawnExitGate() {
+    // highway overhead gantry + tollgate — spans full screen width, one-time landmark
+    const w = W;
+    const h = 260;
+    state.scenery.push({ kind: "exit_gate", x: 0, y: -h - 40, w, h, label: null });
+  }
+
   function seedScenery() {
     const arr = [];
     for (let i = 0; i < 10; i++) arr.push(makeScenery(Math.random() * H));
@@ -465,14 +468,13 @@
     state.bullets = [];
     state.sungsimdangSpawned = false;
     state.stadiumSpawned = false;
-    state.femaleSpawned = false;
+    state.exitGateSpawned = false;
     state.breadDropQueue = 0;
     state.breadDropTimer = 0;
     state.bonusTimer = 3.5;
     state.bonusPoints = 0;
     state.goraniTimer = 9.0;
     state.scoreFloats = [];
-    state.reveal = null;
     scoreEl.textContent = "점수 0";
   }
 
@@ -495,7 +497,6 @@
     else if (reason === "dart") audio.sfx.dart();
     else if (reason === "gorani") audio.sfx.gorani();
     else if (reason === "tanker") audio.sfx.tanker();
-    else if (reason === "male") audio.sfx.twist();
     else audio.sfx.gameOver();
     if (state.score > state.best) {
       state.best = state.score;
@@ -504,11 +505,7 @@
     bestEl.textContent = "최고 " + state.best;
     finalScoreEl.textContent = "점수 " + state.score;
     finalBestEl.textContent = "최고 " + state.best;
-    if (reason === "male") {
-      overTitleEl.textContent = "알고보니 수컷…!";
-      overSubEl.textContent = "\uD83D\uDC94 뜻밖의 반전. 놀랍지만 실화.";
-      overSubEl.classList.remove("hidden");
-    } else if (reason === "trump") {
+    if (reason === "trump") {
       overTitleEl.textContent = "최종 보스에게 잡혔다";
       overSubEl.textContent = "해협은 봉쇄됐다.";
       overSubEl.classList.remove("hidden");
@@ -552,7 +549,7 @@
   }
 
   // --- spawning ---
-  // obstacles: 0 = person (zookeeper/capture/vet), 3 = female-wolf twist, 4 = tanker, 5 = bonus, 6 = gorani
+  // obstacles: 0 = person (zookeeper/capture/vet), 4 = tanker, 5 = bonus, 6 = gorani
   function spawnObstacle() {
     const type = 0;
     const w = 110, h = 150;
@@ -601,12 +598,6 @@
     return null;
   }
 
-  function spawnFemaleWolf() {
-    const w = 120, h = 150;
-    const x = PLAYER_MARGIN + Math.random() * (W - PLAYER_MARGIN * 2 - w);
-    state.obstacles.push({ type: 3, sub: null, x, y: -h - 40, w, h, passed: false, phase: Math.random() * Math.PI * 2 });
-  }
-
   const BONUS_KINDS = ["bread", "bone", "chew"];
   function spawnBonus(sub) {
     const w = 80, h = 80;
@@ -635,17 +626,6 @@
   // --- update ---
   function update(dt) {
     if (!state.running) return;
-
-    // 암컷→수컷 reveal pauses the world until game-over kicks in
-    if (state.reveal) {
-      state.reveal.t += dt;
-      state.shake = Math.min(20, state.shake + 30 * dt);
-      if (state.reveal.t >= 0.9) {
-        state.reveal = null;
-        gameOver("male");
-      }
-      return;
-    }
 
     // intro: torch-cutting cage bars sequence — player can't move, no spawning
     if (state.phase === "intro") {
@@ -716,11 +696,6 @@
       state.sungsimdangSpawned = true;
       spawnSungsimdang();
     }
-    // one-time female wolf trap (looks like bonus — but actually a trap)
-    if (!state.femaleSpawned && state.phase === "normal" && state.distance > 5000) {
-      state.femaleSpawned = true;
-      spawnFemaleWolf();
-    }
     // mid landmark: baseball stadium (spaced out with doubled boss timer)
     if (!state.stadiumSpawned && state.phase === "normal" && state.distance > 6500) {
       state.stadiumSpawned = true;
@@ -735,12 +710,17 @@
         state.bonusTimer = 4.0 + Math.random() * 2.8;
       }
     }
-    // 고라니 돌진 — 빠르게 내려오는 장애물
-    if (state.phase === "normal" && state.distance > 2000) {
+    // 대전 시경계 톨게이트 — 호르무즈로 넘어가기 직전 landmark
+    if (!state.exitGateSpawned && state.phase === "normal" && state.distance > BOSS_DIST - 2600) {
+      state.exitGateSpawned = true;
+      spawnExitGate();
+    }
+    // 고라니 돌진 — 후반부 난이도 스파이크
+    if (state.phase === "normal" && state.distance > 16000) {
       state.goraniTimer -= dt;
       if (state.goraniTimer <= 0) {
         spawnGorani();
-        state.goraniTimer = 7 + Math.random() * 4;
+        state.goraniTimer = 6 + Math.random() * 3;
       }
     }
 
@@ -904,10 +884,7 @@
     for (let i = 0; i < state.obstacles.length; i++) {
       const o = state.obstacles[i];
       if (px1 < o.x + o.w - 14 && px2 > o.x + 14 && py1 < o.y + o.h - 14 && py2 > o.y + 14) {
-        if (o.type === 3) {
-          state.reveal = { x: o.x + o.w / 2, y: o.y + o.h / 2, t: 0 };
-          return;
-        } else if (o.type === 5) {
+        if (o.type === 5) {
           // bonus item — +100 score, floating popup, no death
           state.bonusPoints += 100;
           state.score += 100;
@@ -1654,11 +1631,87 @@
     }
   }
 
+  function drawExitGate(s) {
+    // Highway overhead gantry + tollgate spanning the full road.
+    // Marks the edge of Daejeon — the road gives way to sea after this.
+    const x = s.x, y = s.y, w = s.w, h = s.h;
+    // ground shadow across the road
+    ctx.fillStyle = "rgba(0,0,0,0.18)";
+    ctx.fillRect(x, y + h - 16, w, 14);
+
+    // two side pylons (on the sidewalks)
+    const pylW = 34;
+    const pylH = 190;
+    const pylY = y + 30;
+    const leftX = x + 8;
+    const rightX = x + w - pylW - 8;
+    ctx.fillStyle = "#8a8f95";
+    ctx.fillRect(leftX, pylY, pylW, pylH);
+    ctx.fillRect(rightX, pylY, pylW, pylH);
+    // pylon caps
+    ctx.fillStyle = "#5a6068";
+    ctx.fillRect(leftX - 4, pylY, pylW + 8, 10);
+    ctx.fillRect(rightX - 4, pylY, pylW + 8, 10);
+    // pylon stripes (reflective tape)
+    ctx.fillStyle = "#ffcc33";
+    for (let i = 0; i < 3; i++) {
+      ctx.fillRect(leftX, pylY + 40 + i * 36, pylW, 6);
+      ctx.fillRect(rightX, pylY + 40 + i * 36, pylW, 6);
+    }
+
+    // overhead beam across the full road
+    const beamY = y + 20;
+    const beamH = 22;
+    ctx.fillStyle = "#4a5058";
+    ctx.fillRect(x, beamY, w, beamH);
+    ctx.fillStyle = "#2a2e34";
+    ctx.fillRect(x, beamY + beamH - 4, w, 4);
+
+    // big green highway sign on the beam
+    const sgnW = w * 0.64;
+    const sgnH = 110;
+    const sgnX = x + (w - sgnW) / 2;
+    const sgnY = beamY + beamH + 4;
+    ctx.fillStyle = "#1f6f3e";
+    roundRect(sgnX, sgnY, sgnW, sgnH, 6); ctx.fill();
+    // white inner border
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+    ctx.strokeRect(sgnX + 5, sgnY + 5, sgnW - 10, sgnH - 10);
+    // main text
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "bold 32px 'Apple SD Gothic Neo', sans-serif";
+    ctx.fillText("안녕히 가세요", sgnX + sgnW / 2, sgnY + 34);
+    ctx.font = "bold 22px 'Apple SD Gothic Neo', sans-serif";
+    ctx.fillText("― 대전 시경계 ―", sgnX + sgnW / 2, sgnY + 66);
+    // sub line
+    ctx.font = "bold 14px ui-monospace, 'SF Mono', Menlo, monospace";
+    ctx.fillStyle = "#cfe4d6";
+    ctx.fillText("NEXT EXIT → 호르무즈", sgnX + sgnW / 2, sgnY + 92);
+    ctx.textBaseline = "alphabetic";
+
+    // small side arrows on the beam edges
+    ctx.fillStyle = "#ffd84a";
+    ctx.beginPath();
+    ctx.moveTo(x + pylW + 24, beamY + beamH / 2 - 6);
+    ctx.lineTo(x + pylW + 44, beamY + beamH / 2);
+    ctx.lineTo(x + pylW + 24, beamY + beamH / 2 + 6);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x + w - pylW - 24, beamY + beamH / 2 - 6);
+    ctx.lineTo(x + w - pylW - 44, beamY + beamH / 2);
+    ctx.lineTo(x + w - pylW - 24, beamY + beamH / 2 + 6);
+    ctx.closePath(); ctx.fill();
+  }
+
   function drawScenery(s) {
     if (s.kind === "sungsimdang_big") {
       drawSungsimdangBig(s);
     } else if (s.kind === "stadium_big") {
       drawStadiumBig(s);
+    } else if (s.kind === "exit_gate") {
+      drawExitGate(s);
     } else if (s.kind === "sign") {
       // green street sign on pole
       ctx.fillStyle = "#4a4a4a";
@@ -1799,31 +1852,46 @@
       drawDart(bt);
       return;
     }
+    drawOilBarrel(bt);
+  }
+
+  function drawOilBarrel(bt) {
+    const r = bt.r;
     ctx.save();
     ctx.translate(bt.x, bt.y);
     ctx.rotate(bt.spin);
-    // coin outer
-    ctx.fillStyle = "#e0a817";
+    // barrel body (top-down view, circular)
+    ctx.fillStyle = "#c04a1a";
     ctx.beginPath();
-    ctx.arc(0, 0, bt.r, 0, Math.PI * 2);
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
     ctx.fill();
-    // inner rim
-    ctx.fillStyle = "#f7d34a";
+    // outer rim (darker)
+    ctx.strokeStyle = "#6a2410"; ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(0, 0, bt.r - 4, 0, Math.PI * 2);
-    ctx.fill();
-    // edge darker
-    ctx.strokeStyle = "#8a5a0a"; ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(0, 0, bt.r - 1, 0, Math.PI * 2);
+    ctx.arc(0, 0, r - 1, 0, Math.PI * 2);
     ctx.stroke();
+    // metallic band (inner ring)
+    ctx.strokeStyle = "#e57a3a"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, r - 5, 0, Math.PI * 2);
+    ctx.stroke();
+    // center bunghole (연료구)
+    ctx.fillStyle = "#3a1508";
+    ctx.beginPath();
+    ctx.arc(0, 0, Math.max(2, r * 0.22), 0, Math.PI * 2);
+    ctx.fill();
+    // highlight (metallic shine, moves with rotation — feels like tumbling)
+    ctx.fillStyle = "rgba(255, 220, 180, 0.45)";
+    ctx.beginPath();
+    ctx.arc(-r * 0.35, -r * 0.35, r * 0.22, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
-    // dollar sign (not rotated — always readable)
-    ctx.fillStyle = "#2a5a2a";
-    ctx.font = `bold ${Math.round(bt.r * 1.3)}px sans-serif`;
+    // flammable label (not rotated — always readable)
+    ctx.fillStyle = "#fff2c0";
+    ctx.font = `bold ${Math.max(9, Math.round(r * 0.85))}px sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("$", bt.x, bt.y);
+    ctx.fillText("🔥", bt.x, bt.y - r * 0.02);
     ctx.textBaseline = "alphabetic";
   }
 
@@ -1980,78 +2048,6 @@
   function drawObstacle(o) {
     if (o.type === 0) {
       drawPerson(o);
-    } else if (o.type === 3) {
-      // "female" wolf bait
-      const cx = o.x + o.w / 2;
-      const cy = o.y + o.h / 2;
-      // hearts aura
-      ctx.fillStyle = "rgba(255, 120, 160, 0.55)";
-      const t = performance.now() / 500 + o.phase;
-      for (let i = 0; i < 4; i++) {
-        const a = t + i * Math.PI / 2;
-        const hx = cx + Math.cos(a) * (o.w / 2 + 14);
-        const hy = cy + Math.sin(a) * (o.h / 2 + 10);
-        ctx.beginPath();
-        ctx.arc(hx - 6, hy, 8, 0, Math.PI * 2);
-        ctx.arc(hx + 6, hy, 8, 0, Math.PI * 2);
-        ctx.moveTo(hx - 14, hy + 2);
-        ctx.lineTo(hx, hy + 18);
-        ctx.lineTo(hx + 14, hy + 2);
-        ctx.fill();
-      }
-      // wolf (pink-tinted)
-      ctx.fillStyle = "#c79a8a";
-      ctx.beginPath();
-      ctx.ellipse(cx, cy + 20, o.w * 0.36, o.h * 0.32, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.ellipse(cx, cy - 28, o.w * 0.32, o.h * 0.27, 0, 0, Math.PI * 2);
-      ctx.fill();
-      // ears
-      ctx.fillStyle = "#a07868";
-      ctx.beginPath();
-      ctx.moveTo(cx - 26, cy - 40); ctx.lineTo(cx - 14, cy - 62); ctx.lineTo(cx - 6, cy - 36); ctx.closePath(); ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(cx + 26, cy - 40); ctx.lineTo(cx + 14, cy - 62); ctx.lineTo(cx + 6, cy - 36); ctx.closePath(); ctx.fill();
-      // pink ribbon on head
-      ctx.fillStyle = "#ff6fa1";
-      ctx.beginPath();
-      ctx.moveTo(cx - 2, cy - 52); ctx.lineTo(cx - 18, cy - 58); ctx.lineTo(cx - 18, cy - 44); ctx.closePath(); ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(cx + 2, cy - 52); ctx.lineTo(cx + 18, cy - 58); ctx.lineTo(cx + 18, cy - 44); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = "#ff3f80";
-      ctx.beginPath(); ctx.arc(cx, cy - 51, 5, 0, Math.PI * 2); ctx.fill();
-      // eyelashes + blush
-      ctx.strokeStyle = "#111"; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(cx - 16, cy - 28); ctx.lineTo(cx - 22, cy - 34); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(cx + 16, cy - 28); ctx.lineTo(cx + 22, cy - 34); ctx.stroke();
-      ctx.fillStyle = "#111";
-      ctx.beginPath(); ctx.arc(cx - 14, cy - 26, 3, 0, Math.PI * 2); ctx.arc(cx + 14, cy - 26, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "rgba(255, 120, 140, 0.6)";
-      ctx.beginPath(); ctx.arc(cx - 22, cy - 18, 6, 0, Math.PI * 2); ctx.arc(cx + 22, cy - 18, 6, 0, Math.PI * 2); ctx.fill();
-      // snout
-      ctx.fillStyle = "#e6c4b4";
-      ctx.beginPath(); ctx.ellipse(cx, cy - 10, 12, 9, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "#111";
-      ctx.beginPath(); ctx.ellipse(cx, cy - 14, 5, 3.5, 0, 0, Math.PI * 2); ctx.fill();
-      // ♀ symbol floating above head
-      const sy = cy - 78 + Math.sin(performance.now() / 300 + o.phase) * 4;
-      ctx.fillStyle = "#ff3f80";
-      ctx.beginPath();
-      ctx.arc(cx, sy, 14, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#ffffff";
-      ctx.beginPath();
-      ctx.arc(cx, sy, 10, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "#ff3f80"; ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(cx, sy, 7, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(cx, sy + 7); ctx.lineTo(cx, sy + 18);
-      ctx.moveTo(cx - 5, sy + 13); ctx.lineTo(cx + 5, sy + 13);
-      ctx.stroke();
     } else if (o.type === 4) {
       drawTanker(o);
     } else if (o.type === 5) {
@@ -2171,7 +2167,7 @@
     const cx = o.x + o.w / 2;
     const cy = o.y + o.h / 2;
     const t = performance.now() / 500 + o.phase;
-    // pink heart aura — intentionally matches the female wolf decoy's visual style
+    // pink heart aura around bonus pickups
     ctx.fillStyle = "rgba(255, 120, 160, 0.55)";
     for (let i = 0; i < 4; i++) {
       const a = t + i * Math.PI / 2;
@@ -2626,7 +2622,6 @@
     for (const bt of state.bullets) drawBullet(bt);
     drawBossAnnounce();
     drawScoreFloats();
-    if (state.reveal) drawReveal();
     if (state.phase === "intro") drawIntroFg();
     if (state.phase === "outro") drawOutroBanner();
     ctx.restore();
@@ -2801,86 +2796,6 @@
     ctx.fillText("끝없는 바다 너머로…", W / 2, H * 0.31);
   }
 
-  function drawReveal() {
-    const r = state.reveal;
-    const t = r.t;
-    // darken background
-    ctx.fillStyle = `rgba(0,0,0,${Math.min(0.55, t * 1.5)})`;
-    ctx.fillRect(0, 0, W, H);
-    // phase A (0..0.35): big ♀ bouncing
-    // phase B (0.35..0.55): quick shrink + flash
-    // phase C (0.55..0.9): ♂ growing with 충격 lines
-    if (t < 0.35) {
-      const scale = 1 + Math.sin(t * 18) * 0.08;
-      const sz = 88 * scale;
-      drawFemaleGlyph(r.x, r.y - 40, sz, "#ff3f80");
-    } else if (t < 0.55) {
-      // white flash
-      ctx.fillStyle = `rgba(255,255,255,${1 - (t - 0.35) * 4})`;
-      ctx.fillRect(0, 0, W, H);
-    } else {
-      const grow = Math.min(1, (t - 0.55) * 4);
-      const sz = 60 + grow * 80;
-      // shock lines
-      ctx.strokeStyle = `rgba(255,220,80,${grow})`;
-      ctx.lineWidth = 4;
-      for (let i = 0; i < 12; i++) {
-        const a = (i / 12) * Math.PI * 2;
-        const r1 = sz + 20;
-        const r2 = sz + 60 + Math.sin(t * 20 + i) * 6;
-        ctx.beginPath();
-        ctx.moveTo(r.x + Math.cos(a) * r1, r.y - 40 + Math.sin(a) * r1);
-        ctx.lineTo(r.x + Math.cos(a) * r2, r.y - 40 + Math.sin(a) * r2);
-        ctx.stroke();
-      }
-      drawMaleGlyph(r.x, r.y - 40, sz, "#1e88e5");
-      // '수컷!' shout
-      ctx.fillStyle = "#ffd84a";
-      ctx.font = `bold ${Math.floor(40 + grow * 30)}px 'Apple SD Gothic Neo', sans-serif`;
-      ctx.textAlign = "center";
-      ctx.fillText("수컷!", r.x, r.y + 80);
-    }
-  }
-
-  function drawFemaleGlyph(cx, cy, size, color) {
-    const rIn = size * 0.38;
-    ctx.lineWidth = Math.max(6, size * 0.1);
-    // circle
-    ctx.strokeStyle = color;
-    ctx.beginPath();
-    ctx.arc(cx, cy - rIn * 0.4, rIn, 0, Math.PI * 2);
-    ctx.stroke();
-    // cross below
-    ctx.beginPath();
-    ctx.moveTo(cx, cy + rIn * 0.6); ctx.lineTo(cx, cy + rIn * 1.6);
-    ctx.moveTo(cx - rIn * 0.5, cy + rIn * 1.15); ctx.lineTo(cx + rIn * 0.5, cy + rIn * 1.15);
-    ctx.stroke();
-  }
-
-  function drawMaleGlyph(cx, cy, size, color) {
-    const rIn = size * 0.38;
-    ctx.lineWidth = Math.max(6, size * 0.1);
-    ctx.strokeStyle = color;
-    // circle offset lower-left
-    ctx.beginPath();
-    ctx.arc(cx - rIn * 0.25, cy + rIn * 0.25, rIn, 0, Math.PI * 2);
-    ctx.stroke();
-    // arrow up-right
-    const ax1 = cx + rIn * 0.35, ay1 = cy - rIn * 0.35;
-    const ax2 = cx + rIn * 1.15, ay2 = cy - rIn * 1.15;
-    ctx.beginPath();
-    ctx.moveTo(ax1, ay1);
-    ctx.lineTo(ax2, ay2);
-    ctx.stroke();
-    // arrow head
-    ctx.beginPath();
-    ctx.moveTo(ax2, ay2);
-    ctx.lineTo(ax2 - rIn * 0.4, ay2 + rIn * 0.08);
-    ctx.moveTo(ax2, ay2);
-    ctx.lineTo(ax2 - rIn * 0.08, ay2 + rIn * 0.4);
-    ctx.stroke();
-  }
-
   function loop(t) {
     const dt = Math.min(0.033, (t - state.lastT) / 1000);
     state.lastT = t;
@@ -2989,7 +2904,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.31";
+  const CURRENT_VERSION = "v1.4.32";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
