@@ -756,7 +756,8 @@
       spawnHanbit();
     }
     // periodic bone/chew bonus items during normal phase
-    if (state.phase === "normal" && state.distance > 2200) {
+    // 대전 출구(톨게이트) 지나면 먹을 기회가 없으므로 보너스 스폰 중단
+    if (state.phase === "normal" && state.distance > 2200 && !state.exitGateSpawned) {
       state.bonusTimer -= dt;
       if (state.bonusTimer <= 0) {
         const sub = Math.random() < 0.5 ? "bone" : "chew";
@@ -3483,7 +3484,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.42";
+  const CURRENT_VERSION = "v1.4.43";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
