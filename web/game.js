@@ -898,11 +898,11 @@
         }
       } else if (!b.dead) {
         b.entryT += dt;
-        const ENTRY_DURATION = 1.0;
+        const ENTRY_DURATION = 2.5;
         if (b.entryT < ENTRY_DURATION) {
-          // 등장 연출 — 위에서 내려오는 애니메이션 (움직임·공격·HP 드레인 모두 스킵)
+          // 등장 연출 — 위에서 천천히 내려오는 애니메이션 (움직임·공격·HP 드레인 모두 스킵)
           const t = b.entryT / ENTRY_DURATION;
-          const ease = 1 - Math.pow(1 - t, 2); // easeOutQuad
+          const ease = 1 - Math.pow(1 - t, 3); // easeOutCubic — 더 부드럽게
           b.x = W / 2;
           b.y = -b.h + (280 + b.h) * ease;
           b.fireTimer = 1.0;
@@ -1163,19 +1163,7 @@
       ctx.arc(W - 63, H * 0.1 - 24, 10, 0, Math.PI * 2);
       ctx.fill();
 
-      // banner — HUD(점수/최고) 아래로 내림 (겹침 방지)
-      const bnrY = 130;
-      ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
-      ctx.fillRect(80, bnrY, W - 160, 60);
-      ctx.strokeStyle = "#ffd84a"; ctx.lineWidth = 3;
-      ctx.strokeRect(80, bnrY, W - 160, 60);
-      ctx.fillStyle = "#ffd84a";
-      ctx.font = "bold 30px 'Apple SD Gothic Neo', sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("호르무즈 해협", W / 2, bnrY + 28);
-      ctx.fillStyle = "#fff";
-      ctx.font = "bold 15px sans-serif";
-      ctx.fillText("STRAIT OF HORMUZ", W / 2, bnrY + 48);
+      // 호르무즈 해협 배너 — 제거 (봉쇄 시그널로 이미 인지 가능)
     } else {
       // Daejeon city — sidewalks + asphalt road
       ctx.fillStyle = "#c9c4b8";
@@ -2858,181 +2846,67 @@
   }
 
   function drawIranBoss(b) {
-    // 해협 수문장 — 혁명수비대 군인 스타일 (카키 군복 + 베레 + 칼라장 + 스턴한 얼굴)
+    // 해협 수문장 — 단순화 (카키 군복 + 베레만, 얼굴은 황금머리와 같은 톤)
     const cx = b.x;
     const y = b.y;
-
-    const UNIFORM = "#5a5c3a";      // 올리브/카키
-    const UNIFORM_SHADE = "#44462a";
-    const UNIFORM_HI = "#75784a";
-    const BERET = "#2a2e16";        // 어두운 올리브 베레
-    const SKIN = "#e6c8a0";
-    const SKIN_SHADE = "#b89168";
-    const HAIR = "#2a1f14";
-
-    // 군복 상의 (어깨 라인 넓게)
-    ctx.fillStyle = UNIFORM;
-    roundRect(cx - b.w / 2 + 10, y + b.h * 0.55, b.w - 20, b.h * 0.45, 14);
+    // body / uniform
+    ctx.fillStyle = "#5a5c3a";
+    roundRect(cx - b.w / 2 + 20, y + b.h * 0.55, b.w - 40, b.h * 0.45, 20);
     ctx.fill();
-    // 앞섶 — 버튼 라인
-    ctx.fillStyle = UNIFORM_SHADE;
-    ctx.fillRect(cx - 2, y + b.h * 0.56, 4, b.h * 0.42);
-    ctx.fillStyle = "#c8a848";
-    for (let i = 0; i < 4; i++) {
-      ctx.beginPath();
-      ctx.arc(cx, y + b.h * 0.62 + i * 18, 2.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    // 견장 — 어깨 위 황금 계급장
-    ctx.fillStyle = UNIFORM_SHADE;
-    roundRect(cx - b.w / 2 + 14, y + b.h * 0.56, 48, 14, 3); ctx.fill();
-    roundRect(cx + b.w / 2 - 62, y + b.h * 0.56, 48, 14, 3); ctx.fill();
+    // 앞섶 가운데 라인
+    ctx.fillStyle = "#44462a";
+    ctx.fillRect(cx - 2, y + b.h * 0.58, 4, b.h * 0.4);
+    // 금 버튼 3개
     ctx.fillStyle = "#e8c04a";
-    for (let s = 0; s < 3; s++) {
+    for (let i = 0; i < 3; i++) {
       ctx.beginPath();
-      ctx.arc(cx - b.w / 2 + 22 + s * 12, y + b.h * 0.63, 2.2, 0, Math.PI * 2);
-      ctx.arc(cx + b.w / 2 - 54 + s * 12, y + b.h * 0.63, 2.2, 0, Math.PI * 2);
+      ctx.arc(cx, y + b.h * 0.64 + i * 20, 3, 0, Math.PI * 2);
       ctx.fill();
     }
-    // 칼라장 — 녹색 위 붉은 심볼
-    ctx.fillStyle = "#8a1818";
+    // head (tan)
+    ctx.fillStyle = "#e6c8a0";
     ctx.beginPath();
-    ctx.moveTo(cx - 34, y + b.h * 0.56);
-    ctx.lineTo(cx - 8, y + b.h * 0.56);
-    ctx.lineTo(cx - 20, y + b.h * 0.66);
-    ctx.closePath();
+    ctx.ellipse(cx, y + b.h * 0.4, 90, 72, 0, 0, Math.PI * 2);
     ctx.fill();
+    // jowl shadow
+    ctx.fillStyle = "rgba(0,0,0,0.08)";
     ctx.beginPath();
-    ctx.moveTo(cx + 34, y + b.h * 0.56);
-    ctx.lineTo(cx + 8, y + b.h * 0.56);
-    ctx.lineTo(cx + 20, y + b.h * 0.66);
-    ctx.closePath();
+    ctx.ellipse(cx, y + b.h * 0.5, 80, 40, 0, 0, Math.PI * 2);
     ctx.fill();
-
-    // 목
-    ctx.fillStyle = SKIN;
-    roundRect(cx - 22, y + b.h * 0.48, 44, 18, 6); ctx.fill();
-
-    // 얼굴
-    ctx.fillStyle = SKIN;
+    // 베레 — 단순한 한 덩어리
+    ctx.fillStyle = "#2a2e16";
     ctx.beginPath();
-    ctx.ellipse(cx, y + b.h * 0.4, 76, 70, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, y + b.h * 0.22, 96, 34, 0, Math.PI, Math.PI * 2);
     ctx.fill();
-    // 광대/턱 음영
-    ctx.fillStyle = "rgba(140, 90, 50, 0.18)";
-    ctx.beginPath();
-    ctx.ellipse(cx, y + b.h * 0.5, 66, 28, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 헤어라인 — 짧은 검정머리 (이마선 + 구레나룻)
-    ctx.fillStyle = HAIR;
-    ctx.beginPath();
-    ctx.moveTo(cx - 72, y + b.h * 0.36);
-    ctx.quadraticCurveTo(cx - 78, y + b.h * 0.24, cx - 56, y + b.h * 0.2);
-    ctx.quadraticCurveTo(cx, y + b.h * 0.14, cx + 56, y + b.h * 0.2);
-    ctx.quadraticCurveTo(cx + 78, y + b.h * 0.24, cx + 72, y + b.h * 0.36);
-    ctx.quadraticCurveTo(cx + 40, y + b.h * 0.28, cx, y + b.h * 0.3);
-    ctx.quadraticCurveTo(cx - 40, y + b.h * 0.28, cx - 72, y + b.h * 0.36);
-    ctx.closePath();
-    ctx.fill();
-
-    // 베레 모자 — 옆으로 살짝 기울어진 군용 베레
-    ctx.fillStyle = BERET;
-    ctx.beginPath();
-    // 베이스 밴드 (머리 둘레)
-    ctx.ellipse(cx - 6, y + b.h * 0.2, 80, 18, -0.08, 0, Math.PI * 2);
-    ctx.fill();
-    // 베레 윗부분 — 한쪽으로 처짐
-    ctx.beginPath();
-    ctx.moveTo(cx - 80, y + b.h * 0.18);
-    ctx.quadraticCurveTo(cx - 70, y - 24, cx + 20, y - 20);
-    ctx.quadraticCurveTo(cx + 78, y - 10, cx + 74, y + b.h * 0.18);
-    ctx.quadraticCurveTo(cx + 50, y + b.h * 0.12, cx - 10, y + b.h * 0.1);
-    ctx.quadraticCurveTo(cx - 60, y + b.h * 0.1, cx - 80, y + b.h * 0.18);
-    ctx.closePath();
-    ctx.fill();
-    // 베레 그늘
-    ctx.fillStyle = "rgba(0,0,0,0.3)";
-    ctx.beginPath();
-    ctx.ellipse(cx - 6, y + b.h * 0.22, 76, 8, -0.08, 0, Math.PI * 2);
-    ctx.fill();
-    // 빨간 엠블럼 (혁명수비대 뱃지)
+    ctx.fillRect(cx - 96, y + b.h * 0.22, 192, 6);
+    // 빨간 엠블럼
     ctx.fillStyle = "#c62a2a";
     ctx.beginPath();
-    ctx.arc(cx - 40, y + b.h * 0.18, 7, 0, Math.PI * 2);
+    ctx.arc(cx - 44, y + b.h * 0.18, 6, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#f5d87a";
+    // squint eyes
+    ctx.strokeStyle = "#111";
+    ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.arc(cx - 40, y + b.h * 0.18, 3, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 짙은 검정 눈썹 — 강렬한 표정
-    ctx.strokeStyle = "#1a1108";
-    ctx.lineWidth = 5;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(cx - 42, y + b.h * 0.35);
-    ctx.quadraticCurveTo(cx - 28, y + b.h * 0.33, cx - 14, y + b.h * 0.36);
-    ctx.moveTo(cx + 14, y + b.h * 0.36);
-    ctx.quadraticCurveTo(cx + 28, y + b.h * 0.33, cx + 42, y + b.h * 0.35);
+    ctx.moveTo(cx - 36, y + b.h * 0.38);
+    ctx.lineTo(cx - 18, y + b.h * 0.38);
+    ctx.moveTo(cx + 18, y + b.h * 0.38);
+    ctx.lineTo(cx + 36, y + b.h * 0.38);
     ctx.stroke();
-    ctx.lineCap = "butt";
-
-    // 눈 — 흰자 + 검정 동공 (정면 응시)
-    ctx.fillStyle = "#ffffff";
-    ctx.beginPath();
-    ctx.ellipse(cx - 28, y + b.h * 0.41, 10, 6, 0, 0, Math.PI * 2);
-    ctx.ellipse(cx + 28, y + b.h * 0.41, 10, 6, 0, 0, Math.PI * 2);
+    // mouth
+    ctx.fillStyle = "#3a1f1f";
+    roundRect(cx - 18, y + b.h * 0.48, 36, 10, 4);
     ctx.fill();
-    ctx.fillStyle = "#1a1108";
-    ctx.beginPath();
-    ctx.arc(cx - 28, y + b.h * 0.41, 3.5, 0, Math.PI * 2);
-    ctx.arc(cx + 28, y + b.h * 0.41, 3.5, 0, Math.PI * 2);
+    // arms out
+    ctx.fillStyle = "#5a5c3a";
+    roundRect(cx - b.w / 2 - 10, y + b.h * 0.55, 70, 40, 14);
     ctx.fill();
-
-    // 코 — 간단한 세로선
-    ctx.strokeStyle = SKIN_SHADE;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(cx, y + b.h * 0.44);
-    ctx.quadraticCurveTo(cx - 4, y + b.h * 0.5, cx, y + b.h * 0.52);
-    ctx.lineTo(cx + 4, y + b.h * 0.52);
-    ctx.stroke();
-
-    // 짙은 콧수염 (군인 스타일 — 수염은 짧게)
-    ctx.fillStyle = HAIR;
-    ctx.beginPath();
-    ctx.moveTo(cx - 22, y + b.h * 0.54);
-    ctx.quadraticCurveTo(cx - 18, y + b.h * 0.52, cx - 4, y + b.h * 0.54);
-    ctx.lineTo(cx + 4, y + b.h * 0.54);
-    ctx.quadraticCurveTo(cx + 18, y + b.h * 0.52, cx + 22, y + b.h * 0.54);
-    ctx.quadraticCurveTo(cx + 14, y + b.h * 0.58, cx, y + b.h * 0.58);
-    ctx.quadraticCurveTo(cx - 14, y + b.h * 0.58, cx - 22, y + b.h * 0.54);
-    ctx.closePath();
+    roundRect(cx + b.w / 2 - 60, y + b.h * 0.55, 70, 40, 14);
     ctx.fill();
-
-    // 입 — 굳게 다문 선
-    ctx.strokeStyle = "#3a1f14";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(cx - 12, y + b.h * 0.6);
-    ctx.lineTo(cx + 12, y + b.h * 0.6);
-    ctx.stroke();
-
-    // 팔 — 군복 소매
-    ctx.fillStyle = UNIFORM;
-    roundRect(cx - b.w / 2 - 6, y + b.h * 0.58, 64, 42, 12);
-    ctx.fill();
-    roundRect(cx + b.w / 2 - 58, y + b.h * 0.58, 64, 42, 12);
-    ctx.fill();
-    // 소매 커프스
-    ctx.fillStyle = UNIFORM_SHADE;
-    ctx.fillRect(cx - b.w / 2 - 6, y + b.h * 0.74, 64, 6);
-    ctx.fillRect(cx + b.w / 2 - 58, y + b.h * 0.74, 64, 6);
-    // 손
-    ctx.fillStyle = SKIN;
-    ctx.beginPath(); ctx.arc(cx - b.w / 2, y + b.h * 0.82, 20, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx + b.w / 2, y + b.h * 0.82, 20, 0, Math.PI * 2); ctx.fill();
+    // hands
+    ctx.fillStyle = "#e6c8a0";
+    ctx.beginPath(); ctx.arc(cx - b.w / 2 - 6, y + b.h * 0.75, 22, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + b.w / 2 + 6, y + b.h * 0.75, 22, 0, Math.PI * 2); ctx.fill();
   }
 
   function drawTrumpBoss(b) {
@@ -3070,61 +2944,6 @@
     ctx.beginPath();
     ctx.ellipse(cx, y + b.h * 0.5, 80, 40, 0, 0, Math.PI * 2);
     ctx.fill();
-    // 머리 — 최신 콤오버 (뒤 볼륨 + 단일 덩어리 + 방향 결 + 하이라이트 + 경계 음영)
-    const HAIR = "#f5d87a";
-    const HAIR_SHADE = "#d8b048";
-    const HAIR_HI = "#fbeaa8";
-    // 뒤쪽 볼륨
-    ctx.fillStyle = HAIR_SHADE;
-    ctx.beginPath();
-    ctx.moveTo(cx - 96, y + b.h * 0.22);
-    ctx.quadraticCurveTo(cx - 108, y - 10, cx - 40, y - 28);
-    ctx.quadraticCurveTo(cx + 30, y - 32, cx + 96, y - 10);
-    ctx.quadraticCurveTo(cx + 112, y + b.h * 0.14, cx + 96, y + b.h * 0.3);
-    ctx.quadraticCurveTo(cx + 80, y + b.h * 0.22, cx, y + b.h * 0.22);
-    ctx.quadraticCurveTo(cx - 80, y + b.h * 0.22, cx - 96, y + b.h * 0.22);
-    ctx.closePath();
-    ctx.fill();
-    // 콤오버 단일 덩어리
-    ctx.fillStyle = HAIR;
-    ctx.beginPath();
-    ctx.moveTo(cx - 82, y + b.h * 0.26);
-    ctx.quadraticCurveTo(cx - 96, y - 4, cx - 40, y - 22);
-    ctx.quadraticCurveTo(cx + 20, y - 28, cx + 84, y - 8);
-    ctx.quadraticCurveTo(cx + 108, y + b.h * 0.16, cx + 96, y + b.h * 0.32);
-    ctx.quadraticCurveTo(cx + 86, y + b.h * 0.36, cx + 64, y + b.h * 0.3);
-    ctx.quadraticCurveTo(cx + 20, y + b.h * 0.24, cx - 30, y + b.h * 0.28);
-    ctx.quadraticCurveTo(cx - 66, y + b.h * 0.3, cx - 82, y + b.h * 0.26);
-    ctx.closePath();
-    ctx.fill();
-    // 방향 결
-    ctx.strokeStyle = HAIR_SHADE;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const t = i / 5;
-      const sx = cx - 70 + t * 20;
-      const sy = y - 10 + t * 4;
-      const ex = cx + 80 - t * 10;
-      const ey = y + b.h * 0.28 - t * 4;
-      ctx.moveTo(sx, sy);
-      ctx.quadraticCurveTo(cx + 10, y - 4 + t * 8, ex, ey);
-    }
-    ctx.stroke();
-    // 하이라이트
-    ctx.strokeStyle = HAIR_HI;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(cx - 50, y - 14);
-    ctx.quadraticCurveTo(cx + 10, y - 20, cx + 72, y + b.h * 0.02);
-    ctx.stroke();
-    // 이마-머리 경계 음영
-    ctx.strokeStyle = "rgba(120, 80, 20, 0.35)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(cx - 74, y + b.h * 0.28);
-    ctx.quadraticCurveTo(cx - 10, y + b.h * 0.26, cx + 60, y + b.h * 0.3);
-    ctx.stroke();
     // squint eyes
     ctx.strokeStyle = "#111";
     ctx.lineWidth = 4;
@@ -3630,7 +3449,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.40";
+  const CURRENT_VERSION = "v1.4.41";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
