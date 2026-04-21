@@ -341,12 +341,13 @@
     bullets: [],
     sungsimdangSpawned: false,
     stadiumSpawned: false,
+    hanbitSpawned: false,
     exitGateSpawned: false,
     breadDropQueue: 0, // number of bread items still to drop after the bakery
     breadDropTimer: 0,
     bonusTimer: 3.5,
     bonusPoints: 0,
-    goraniTimer: 9.0,
+    goraniTimer: 1.5,
     scoreFloats: [], // { x, y, t, text }
   };
 
@@ -442,6 +443,16 @@
     state.scenery.push({ kind: "exit_gate", x: 0, y: -h - 40, w, h, label: null });
   }
 
+  function spawnHanbit() {
+    // 한빛탑 (1993 대전엑스포 기념탑) — tall spire on sidewalk edge
+    const side = Math.random() < 0.5 ? "L" : "R";
+    const w = 140;
+    const h = 520;
+    const x = side === "L" ? -30 : W - w + 30;
+    const y = -h - 40;
+    state.scenery.push({ kind: "hanbit_big", x, y, w, h, side });
+  }
+
   function seedScenery() {
     const arr = [];
     for (let i = 0; i < 10; i++) arr.push(makeScenery(Math.random() * H));
@@ -470,12 +481,13 @@
     state.bullets = [];
     state.sungsimdangSpawned = false;
     state.stadiumSpawned = false;
+    state.hanbitSpawned = false;
     state.exitGateSpawned = false;
     state.breadDropQueue = 0;
     state.breadDropTimer = 0;
     state.bonusTimer = 3.5;
     state.bonusPoints = 0;
-    state.goraniTimer = 9.0;
+    state.goraniTimer = 1.5;
     state.scoreFloats = [];
     scoreEl.textContent = "점수 0";
   }
@@ -706,6 +718,11 @@
       state.stadiumSpawned = true;
       spawnStadium();
     }
+    // late-mid landmark: 한빛탑 (93 엑스포 상징)
+    if (!state.hanbitSpawned && state.phase === "normal" && state.distance > 10500) {
+      state.hanbitSpawned = true;
+      spawnHanbit();
+    }
     // periodic bone/chew bonus items during normal phase
     if (state.phase === "normal" && state.distance > 2200) {
       state.bonusTimer -= dt;
@@ -721,11 +738,11 @@
       spawnExitGate();
     }
     // 고라니 돌진 — 후반부 난이도 스파이크 (톨게이트 전까지만)
-    if (state.phase === "normal" && !state.exitGateSpawned && state.distance > 16000) {
+    if (state.phase === "normal" && !state.exitGateSpawned && state.distance > 14000) {
       state.goraniTimer -= dt;
       if (state.goraniTimer <= 0) {
         spawnGorani();
-        state.goraniTimer = 6 + Math.random() * 3;
+        state.goraniTimer = 3.5 + Math.random() * 2.0;
       }
     }
 
@@ -1317,10 +1334,37 @@
     const vRight = Math.min(x + w, W - 4);
     const vCenter = (vLeft + vRight) / 2;
 
-    // vertical 선심당 signboard — anchor on the inward (visible) edge
+    // signboard geometry (drawn after windows so it sits on top)
     const sbW = 36;
     const sbX = onLeft ? vRight - sbW - 4 : vLeft + 4;
     const sbY = y + 160;
+
+    // arched windows first — signboard/banner will overlay on top to avoid text being covered
+    for (let r = 0; r < 2; r++) {
+      for (let c = 0; c < 2; c++) {
+        const wx = x + 18 + c * ((w - 80) / 2);
+        const wy = y + 250 + r * 80;
+        // skip windows that would sit under the vertical signboard strip
+        if (wx + 32 > sbX - 2 && wx < sbX + sbW + 2) continue;
+        ctx.fillStyle = "#2a2a30";
+        ctx.beginPath();
+        ctx.moveTo(wx, wy + 56);
+        ctx.lineTo(wx, wy + 16);
+        ctx.quadraticCurveTo(wx + 16, wy - 6, wx + 32, wy + 16);
+        ctx.lineTo(wx + 32, wy + 56);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#e8d8b8";
+        ctx.fillRect(wx + 3, wy + 18, 26, 34);
+        ctx.strokeStyle = "#3a2a20"; ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(wx + 16, wy + 14); ctx.lineTo(wx + 16, wy + 54);
+        ctx.moveTo(wx + 3, wy + 34); ctx.lineTo(wx + 29, wy + 34);
+        ctx.stroke();
+      }
+    }
+
+    // vertical 빵맛집 signboard — painted on top of any leftover window geometry
     ctx.fillStyle = "#1a1a1a";
     roundRect(sbX, sbY, sbW, 220, 3); ctx.fill();
     ctx.fillStyle = "#ffd84a";
@@ -1343,29 +1387,6 @@
     ctx.font = "bold 20px 'Apple SD Gothic Neo', sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("갓 구운 빵", bnCx, y + 207);
-
-    // arched windows (2 rows of 2, larger for the bigger facade)
-    for (let r = 0; r < 2; r++) {
-      for (let c = 0; c < 2; c++) {
-        const wx = x + 18 + c * ((w - 80) / 2);
-        const wy = y + 250 + r * 80;
-        ctx.fillStyle = "#2a2a30";
-        ctx.beginPath();
-        ctx.moveTo(wx, wy + 56);
-        ctx.lineTo(wx, wy + 16);
-        ctx.quadraticCurveTo(wx + 16, wy - 6, wx + 32, wy + 16);
-        ctx.lineTo(wx + 32, wy + 56);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = "#e8d8b8";
-        ctx.fillRect(wx + 3, wy + 18, 26, 34);
-        ctx.strokeStyle = "#3a2a20"; ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(wx + 16, wy + 14); ctx.lineTo(wx + 16, wy + 54);
-        ctx.moveTo(wx + 3, wy + 34); ctx.lineTo(wx + 29, wy + 34);
-        ctx.stroke();
-      }
-    }
 
     // awnings at bottom (dark gray)
     ctx.fillStyle = "#2a2a30";
@@ -1711,11 +1732,163 @@
     ctx.closePath(); ctx.fill();
   }
 
+  function drawHanbitBig(s) {
+    // 한빛탑 — 1993 대전엑스포의 상징. Stone base → tapered concrete shaft → observation pod → spire.
+    const cx = s.x + s.w / 2;
+    const baseY = s.y + s.h; // ground line of the tower
+    const topY = s.y;
+
+    // shadow on the sidewalk
+    ctx.fillStyle = "rgba(0,0,0,0.22)";
+    ctx.beginPath();
+    ctx.ellipse(cx, baseY - 6, s.w * 0.62, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // stone base (octagonal plaza pedestal)
+    const baseW = s.w * 0.9;
+    const baseH = 36;
+    ctx.fillStyle = "#8a7c66";
+    ctx.fillRect(cx - baseW / 2, baseY - baseH, baseW, baseH);
+    ctx.fillStyle = "#6a5e4a";
+    ctx.fillRect(cx - baseW / 2, baseY - 8, baseW, 8);
+    // base edge highlight
+    ctx.fillStyle = "#a69780";
+    ctx.fillRect(cx - baseW / 2, baseY - baseH, baseW, 4);
+
+    // shaft dimensions (tapers toward the top)
+    const shaftBottomW = s.w * 0.42;
+    const shaftTopW = s.w * 0.18;
+    const shaftBottomY = baseY - baseH;
+    const shaftTopY = topY + s.h * 0.22; // leaves room for pod + spire above
+    // main concrete shaft
+    ctx.fillStyle = "#dcd4c4";
+    ctx.beginPath();
+    ctx.moveTo(cx - shaftBottomW / 2, shaftBottomY);
+    ctx.lineTo(cx + shaftBottomW / 2, shaftBottomY);
+    ctx.lineTo(cx + shaftTopW / 2, shaftTopY);
+    ctx.lineTo(cx - shaftTopW / 2, shaftTopY);
+    ctx.closePath();
+    ctx.fill();
+    // shaft right-side shading
+    ctx.fillStyle = "rgba(0,0,0,0.12)";
+    ctx.beginPath();
+    ctx.moveTo(cx + shaftBottomW / 2 - 8, shaftBottomY);
+    ctx.lineTo(cx + shaftBottomW / 2, shaftBottomY);
+    ctx.lineTo(cx + shaftTopW / 2, shaftTopY);
+    ctx.lineTo(cx + shaftTopW / 2 - 4, shaftTopY);
+    ctx.closePath();
+    ctx.fill();
+    // shaft left highlight
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    ctx.fillRect(cx - shaftBottomW / 2 + 4, shaftTopY, 3, shaftBottomY - shaftTopY);
+
+    // horizontal concrete ribs (evenly spaced)
+    ctx.strokeStyle = "rgba(120,108,86,0.55)";
+    ctx.lineWidth = 1;
+    const ribCount = 7;
+    for (let i = 1; i < ribCount; i++) {
+      const t = i / ribCount;
+      const ry = shaftBottomY + (shaftTopY - shaftBottomY) * t;
+      const rw = shaftBottomW + (shaftTopW - shaftBottomW) * t;
+      ctx.beginPath();
+      ctx.moveTo(cx - rw / 2, ry);
+      ctx.lineTo(cx + rw / 2, ry);
+      ctx.stroke();
+    }
+
+    // observation pod — trapezoidal deck wider than the shaft
+    const podCy = shaftTopY;
+    const podW = s.w * 0.58;
+    const podH = 28;
+    // pod underside (darker)
+    ctx.fillStyle = "#9aa6b0";
+    ctx.beginPath();
+    ctx.moveTo(cx - shaftTopW / 2 - 2, podCy);
+    ctx.lineTo(cx + shaftTopW / 2 + 2, podCy);
+    ctx.lineTo(cx + podW / 2, podCy - podH * 0.45);
+    ctx.lineTo(cx - podW / 2, podCy - podH * 0.45);
+    ctx.closePath();
+    ctx.fill();
+    // pod main body (silver-blue)
+    ctx.fillStyle = "#c7d2dc";
+    roundRect(cx - podW / 2, podCy - podH, podW, podH * 0.6, 3); ctx.fill();
+    // pod window strip
+    ctx.fillStyle = "#2a4a6a";
+    ctx.fillRect(cx - podW / 2 + 6, podCy - podH + 6, podW - 12, 7);
+    // window mullions
+    ctx.fillStyle = "#c7d2dc";
+    for (let i = 1; i < 8; i++) {
+      ctx.fillRect(cx - podW / 2 + 6 + i * ((podW - 12) / 8), podCy - podH + 6, 1, 7);
+    }
+    // pod crown (thin band above windows)
+    ctx.fillStyle = "#e8eef3";
+    ctx.fillRect(cx - podW / 2 + 4, podCy - podH + 2, podW - 8, 3);
+
+    // upper shaft section above the pod (narrow column up to spire base)
+    const upperBottomY = podCy - podH;
+    const upperTopY = topY + 52;
+    const upperBottomW = shaftTopW * 0.85;
+    const upperTopW = shaftTopW * 0.45;
+    ctx.fillStyle = "#dcd4c4";
+    ctx.beginPath();
+    ctx.moveTo(cx - upperBottomW / 2, upperBottomY);
+    ctx.lineTo(cx + upperBottomW / 2, upperBottomY);
+    ctx.lineTo(cx + upperTopW / 2, upperTopY);
+    ctx.lineTo(cx - upperTopW / 2, upperTopY);
+    ctx.closePath();
+    ctx.fill();
+    // upper shaft shading
+    ctx.fillStyle = "rgba(0,0,0,0.14)";
+    ctx.fillRect(cx + upperTopW / 2 - 2, upperTopY, 2, upperBottomY - upperTopY);
+
+    // spire — long thin triangle
+    const spireTipY = topY + 6;
+    ctx.fillStyle = "#a8b2bc";
+    ctx.beginPath();
+    ctx.moveTo(cx - upperTopW / 2, upperTopY);
+    ctx.lineTo(cx + upperTopW / 2, upperTopY);
+    ctx.lineTo(cx, spireTipY);
+    ctx.closePath();
+    ctx.fill();
+    // spire highlight
+    ctx.fillStyle = "#e4ebf2";
+    ctx.beginPath();
+    ctx.moveTo(cx - upperTopW / 2 + 1, upperTopY);
+    ctx.lineTo(cx - 1, spireTipY + 2);
+    ctx.lineTo(cx, spireTipY);
+    ctx.closePath();
+    ctx.fill();
+
+    // aviation warning light on the tip (subtle red blink via distance)
+    const blink = (Math.floor(state.distance / 40) % 2) === 0;
+    ctx.fillStyle = blink ? "#ff4030" : "#802018";
+    ctx.beginPath();
+    ctx.arc(cx, spireTipY, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // plaque on the base
+    const plqW = 70, plqH = 22;
+    const plqX = cx - plqW / 2;
+    const plqY = baseY - baseH - plqH - 2;
+    ctx.fillStyle = "#2a2a2a";
+    roundRect(plqX - 2, plqY - 2, plqW + 4, plqH + 4, 3); ctx.fill();
+    ctx.fillStyle = "#ffd84a";
+    roundRect(plqX, plqY, plqW, plqH, 3); ctx.fill();
+    ctx.fillStyle = "#1a1a1a";
+    ctx.font = "bold 13px 'Apple SD Gothic Neo', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("한빛탑", cx, plqY + plqH / 2);
+    ctx.textBaseline = "alphabetic";
+  }
+
   function drawScenery(s) {
     if (s.kind === "sungsimdang_big") {
       drawSungsimdangBig(s);
     } else if (s.kind === "stadium_big") {
       drawStadiumBig(s);
+    } else if (s.kind === "hanbit_big") {
+      drawHanbitBig(s);
     } else if (s.kind === "exit_gate") {
       drawExitGate(s);
     } else if (s.kind === "sign") {
@@ -2964,7 +3137,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.34";
+  const CURRENT_VERSION = "v1.4.35";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
