@@ -3506,7 +3506,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.5.0";
+  const CURRENT_VERSION = "v1.5.1";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
