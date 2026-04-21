@@ -469,6 +469,19 @@
     const h = 340;
     const x = side === "L" ? 16 : W - w - 16;
     const y = -h - 40;
+
+    // 한빛탑과 겹칠 수 있는 일반 건물/간판/나무는 훨씬 위로 밀어올려서 등장 구간을 비워둠
+    const hx1 = x - 12;
+    const hx2 = x + w + 12;
+    const clearY2 = y + h + 120;
+    for (let i = 0; i < state.scenery.length; i++) {
+      const s = state.scenery[i];
+      if (s.kind !== "building" && s.kind !== "sign" && s.kind !== "tree") continue;
+      if (s.x < hx2 && s.x + s.w > hx1 && s.y < clearY2) {
+        state.scenery[i] = makeScenery(-s.h - 2200 - Math.random() * 400);
+      }
+    }
+
     state.scenery.push({ kind: "hanbit_big", x, y, w, h, side });
   }
 
@@ -3493,7 +3506,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.46";
+  const CURRENT_VERSION = "v1.4.47";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
