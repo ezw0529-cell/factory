@@ -715,8 +715,8 @@
       state.exitGateSpawned = true;
       spawnExitGate();
     }
-    // 고라니 돌진 — 후반부 난이도 스파이크
-    if (state.phase === "normal" && state.distance > 16000) {
+    // 고라니 돌진 — 후반부 난이도 스파이크 (톨게이트 전까지만)
+    if (state.phase === "normal" && !state.exitGateSpawned && state.distance > 16000) {
       state.goraniTimer -= dt;
       if (state.goraniTimer <= 0) {
         spawnGorani();
@@ -761,7 +761,8 @@
     }
 
     // spawn (land obstacles in normal, tankers during approach/boss)
-    if (state.phase === "normal") {
+    // 톨게이트 지나면 빌런 스폰 중단 — 조용한 도로로 호르무즈까지 배웅
+    if (state.phase === "normal" && !state.exitGateSpawned) {
       state.spawnTimer -= dt;
       if (state.spawnTimer <= 0) {
         spawnObstacle();
@@ -1856,43 +1857,91 @@
   }
 
   function drawOilBarrel(bt) {
+    // 측면 실린더 뷰 — 굴러오는 느낌을 위해 bt.spin 으로 tumble
     const r = bt.r;
+    const bodyW = r * 1.7;   // 좁은 쪽 (원통 폭)
+    const bodyH = r * 2.2;   // 긴 쪽 (원통 높이)
     ctx.save();
     ctx.translate(bt.x, bt.y);
-    ctx.rotate(bt.spin);
-    // barrel body (top-down view, circular)
-    ctx.fillStyle = "#c04a1a";
+    ctx.rotate(bt.spin * 0.6);
+
+    // 그림자 (아래쪽 살짝)
+    ctx.fillStyle = "rgba(0,0,0,0.22)";
     ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.ellipse(2, bodyH / 2 + 6, bodyW / 2, 5, 0, 0, Math.PI * 2);
     ctx.fill();
-    // outer rim (darker)
-    ctx.strokeStyle = "#6a2410"; ctx.lineWidth = 2;
+
+    // 원통 몸통 (주황)
+    const bx = -bodyW / 2;
+    const by = -bodyH / 2;
+    const grad = ctx.createLinearGradient(bx, 0, bx + bodyW, 0);
+    grad.addColorStop(0, "#8a2a0a");
+    grad.addColorStop(0.4, "#d8602a");
+    grad.addColorStop(0.7, "#e8884a");
+    grad.addColorStop(1, "#7a240a");
+    ctx.fillStyle = grad;
+    ctx.fillRect(bx, by + 4, bodyW, bodyH - 8);
+
+    // 위/아래 뚜껑 (타원으로 3D 실린더 느낌)
+    ctx.fillStyle = "#b04018";
     ctx.beginPath();
-    ctx.arc(0, 0, r - 1, 0, Math.PI * 2);
+    ctx.ellipse(0, by + 4, bodyW / 2, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#5a1808";
+    ctx.beginPath();
+    ctx.ellipse(0, by + bodyH - 4, bodyW / 2, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // 위 뚜껑 하이라이트
+    ctx.fillStyle = "#f0a070";
+    ctx.beginPath();
+    ctx.ellipse(0, by + 4, bodyW / 2 - 4, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // 마개 (bunghole)
+    ctx.fillStyle = "#2a0a04";
+    ctx.beginPath();
+    ctx.arc(bodyW / 4, by + 4, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 가로 리브(골) 2줄 — 기름통 정체성의 핵심
+    ctx.strokeStyle = "#5a1808";
+    ctx.lineWidth = 2;
+    const rib1 = by + bodyH * 0.32;
+    const rib2 = by + bodyH * 0.68;
+    ctx.beginPath();
+    ctx.moveTo(bx + 2, rib1);
+    ctx.lineTo(bx + bodyW - 2, rib1);
+    ctx.moveTo(bx + 2, rib2);
+    ctx.lineTo(bx + bodyW - 2, rib2);
     ctx.stroke();
-    // metallic band (inner ring)
-    ctx.strokeStyle = "#e57a3a"; ctx.lineWidth = 2;
+    // 리브 하이라이트
+    ctx.strokeStyle = "rgba(255, 200, 150, 0.5)";
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.arc(0, 0, r - 5, 0, Math.PI * 2);
+    ctx.moveTo(bx + 2, rib1 - 2);
+    ctx.lineTo(bx + bodyW - 2, rib1 - 2);
+    ctx.moveTo(bx + 2, rib2 - 2);
+    ctx.lineTo(bx + bodyW - 2, rib2 - 2);
     ctx.stroke();
-    // center bunghole (연료구)
-    ctx.fillStyle = "#3a1508";
-    ctx.beginPath();
-    ctx.arc(0, 0, Math.max(2, r * 0.22), 0, Math.PI * 2);
-    ctx.fill();
-    // highlight (metallic shine, moves with rotation — feels like tumbling)
-    ctx.fillStyle = "rgba(255, 220, 180, 0.45)";
-    ctx.beginPath();
-    ctx.arc(-r * 0.35, -r * 0.35, r * 0.22, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-    // flammable label (not rotated — always readable)
-    ctx.fillStyle = "#fff2c0";
-    ctx.font = `bold ${Math.max(9, Math.round(r * 0.85))}px sans-serif`;
+
+    // OIL 라벨 — 가운데 칸
+    ctx.fillStyle = "#1a0a04";
+    const labelW = bodyW * 0.7;
+    const labelH = (rib2 - rib1) * 0.6;
+    const labelX = -labelW / 2;
+    const labelY = (rib1 + rib2) / 2 - labelH / 2;
+    ctx.fillRect(labelX, labelY, labelW, labelH);
+    ctx.fillStyle = "#ffd84a";
+    ctx.font = `bold ${Math.max(10, Math.round(r * 0.7))}px sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("🔥", bt.x, bt.y - r * 0.02);
+    ctx.fillText("OIL", 0, (rib1 + rib2) / 2);
     ctx.textBaseline = "alphabetic";
+
+    // 세로 하이라이트 (금속 반사)
+    ctx.fillStyle = "rgba(255, 230, 190, 0.28)";
+    ctx.fillRect(bx + 4, by + 8, 4, bodyH - 16);
+
+    ctx.restore();
   }
 
   function drawDart(bt) {
@@ -2904,7 +2953,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.32";
+  const CURRENT_VERSION = "v1.4.33";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
