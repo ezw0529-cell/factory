@@ -876,7 +876,8 @@
     if (state.phase === "boss" && state.boss) {
       const b = state.boss;
       const BOSS_MIN_X = 140, BOSS_MAX_X = W - 140;
-      const BOSS_MIN_Y = 220, BOSS_MAX_Y = 520;
+      // 두 보스 모두 수면 위까지만 내려오도록 제한 (수면 = H*0.55, 보스 h=260)
+      const BOSS_MIN_Y = 220, BOSS_MAX_Y = Math.floor(H * 0.55 - 260 * 0.9);
 
       if (b.transitionT > 0) {
         // 페이즈 1 → 페이즈 2 핸드오프: 수문장 퇴장 후 역봉쇄 시그널 깜빡깜빡 → 황금머리 입장
@@ -907,19 +908,22 @@
           b.y = -b.h + (280 + b.h) * ease;
           b.fireTimer = 1.0;
         } else {
-          // up/down/left/right drift with bounce + jitter
-          b.x += b.vx * dt;
-          b.y += b.vy * dt;
+          // up/down/left/right drift with bounce + jitter — 페이즈 2는 속도 증가
+          const moveMult = b.bossPhase === 2 ? 1.4 : 1.0;
+          b.x += b.vx * moveMult * dt;
+          b.y += b.vy * moveMult * dt;
           if (b.x < BOSS_MIN_X) { b.x = BOSS_MIN_X; b.vx = Math.abs(b.vx); }
           if (b.x > BOSS_MAX_X) { b.x = BOSS_MAX_X; b.vx = -Math.abs(b.vx); }
           if (b.y < BOSS_MIN_Y) { b.y = BOSS_MIN_Y; b.vy = Math.abs(b.vy); }
           if (b.y > BOSS_MAX_Y) { b.y = BOSS_MAX_Y; b.vy = -Math.abs(b.vy); }
-          // occasional direction flip so movement feels alive
-          if (Math.random() < 0.012) b.vx = (Math.random() * 2 - 1) * 240;
-          if (Math.random() < 0.012) b.vy = (Math.random() * 2 - 1) * 130;
+          // 방향 전환 빈도 — 페이즈 2는 더 불규칙하게
+          const flipRate = b.bossPhase === 2 ? 0.022 : 0.012;
+          if (Math.random() < flipRate) b.vx = (Math.random() * 2 - 1) * (b.bossPhase === 2 ? 300 : 240);
+          if (Math.random() < flipRate) b.vy = (Math.random() * 2 - 1) * (b.bossPhase === 2 ? 170 : 130);
 
-          // HP drain — each phase lasts ~15s
-          const drainRate = b.hpMax / 15;
+          // HP drain — 페이즈 1 ~15s, 페이즈 2 ~22s (최종 보스라 더 오래 버텨야 함)
+          const drainDuration = b.bossPhase === 2 ? 22 : 15;
+          const drainRate = b.hpMax / drainDuration;
           b.hp = Math.max(0, b.hp - drainRate * dt);
 
           // fire projectiles at the player
@@ -930,17 +934,41 @@
             const dx = p.x - bx;
             const dy = PLAYER_Y - by;
             const mag = Math.hypot(dx, dy) || 1;
-            const speed = b.bossPhase === 1 ? 480 : 440;
-            state.bullets.push({
-              x: bx, y: by,
-              vx: dx / mag * speed,
-              vy: dy / mag * speed,
-              r: b.bossPhase === 1 ? 26 : 24,
-              spin: 0,
-              kind: b.bossPhase === 1 ? "oilbarrel" : "money",
-            });
+            const speed = b.bossPhase === 1 ? 480 : 560;
+            const kind = b.bossPhase === 1 ? "oilbarrel" : "money";
+            const r = b.bossPhase === 1 ? 26 : 24;
+            if (b.bossPhase === 2) {
+              // 최종 보스 — 조준탄 + 좌우로 벌어지는 스프레드 (3발)
+              const spread = 0.22;
+              const cos = Math.cos(spread), sin = Math.sin(spread);
+              const vxA = dx / mag * speed;
+              const vyA = dy / mag * speed;
+              // 중앙 (조준)
+              state.bullets.push({ x: bx, y: by, vx: vxA, vy: vyA, r, spin: 0, kind });
+              // 좌측 회전
+              state.bullets.push({
+                x: bx, y: by,
+                vx: vxA * cos - vyA * sin,
+                vy: vxA * sin + vyA * cos,
+                r, spin: 0, kind,
+              });
+              // 우측 회전
+              state.bullets.push({
+                x: bx, y: by,
+                vx: vxA * cos + vyA * sin,
+                vy: -vxA * sin + vyA * cos,
+                r, spin: 0, kind,
+              });
+            } else {
+              state.bullets.push({
+                x: bx, y: by,
+                vx: dx / mag * speed,
+                vy: dy / mag * speed,
+                r, spin: 0, kind,
+              });
+            }
             audio.sfx.bossFire();
-            b.fireTimer = b.bossPhase === 1 ? 1.05 : 0.9;
+            b.fireTimer = b.bossPhase === 1 ? 1.05 : 0.7;
           }
 
           // HP 소진 → 두 보스 모두 쓰러지는 연출 먼저 (마리오식 스핀+낙하)
@@ -1837,20 +1865,20 @@
     ctx.ellipse(cx, baseY - 4, s.w * 0.5, 8, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // 둥근 돌 베이스
+    // 둥근 돌 베이스 — 짙은 그레이로 바닥과 대비
     const baseW = s.w * 0.82;
     const baseH = 20;
-    ctx.fillStyle = "#8a7c66";
+    ctx.fillStyle = "#4a4238";
     roundRect(cx - baseW / 2, baseY - baseH, baseW, baseH, 6); ctx.fill();
-    ctx.fillStyle = "#a69780";
+    ctx.fillStyle = "#6a6256";
     ctx.fillRect(cx - baseW / 2 + 4, baseY - baseH + 3, baseW - 8, 2);
 
-    // 통통한 샤프트 (끝이 살짝 좁아짐)
+    // 통통한 샤프트 — 살구색(한빛탑 실제 톤)으로 바탕과 대비
     const shaftBottomW = s.w * 0.38;
     const shaftTopW = s.w * 0.26;
     const shaftBottomY = baseY - baseH;
     const shaftTopY = topY + s.h * 0.34;
-    ctx.fillStyle = "#dcd4c4";
+    ctx.fillStyle = "#e89d6e";
     ctx.beginPath();
     ctx.moveTo(cx - shaftBottomW / 2, shaftBottomY);
     ctx.lineTo(cx + shaftBottomW / 2, shaftBottomY);
@@ -1858,38 +1886,46 @@
     ctx.lineTo(cx - shaftTopW / 2, shaftTopY);
     ctx.closePath();
     ctx.fill();
+    // 샤프트 외곽선으로 실루엣 강조
+    ctx.strokeStyle = "#7a3a18";
+    ctx.lineWidth = 2;
+    ctx.stroke();
     // 샤프트 오른쪽 음영
-    ctx.fillStyle = "rgba(0,0,0,0.12)";
+    ctx.fillStyle = "rgba(120,40,10,0.25)";
     ctx.fillRect(cx + shaftTopW / 2 - 3, shaftTopY, 3, shaftBottomY - shaftTopY);
 
-    // 둥근 관측 포드 — 납작한 UFO 느낌
+    // 둥근 관측 포드 — 코발트 블루로 하늘과 배경에서 또렷이 보이게
     const podCy = shaftTopY - 2;
     const podW = s.w * 0.72;
     const podH = 22;
-    // 아랫면 (진한 색)
-    ctx.fillStyle = "#9aa6b0";
+    // 아랫면
+    ctx.fillStyle = "#1f4a78";
     ctx.beginPath();
     ctx.ellipse(cx, podCy, podW / 2, podH * 0.45, 0, 0, Math.PI);
     ctx.fill();
-    // 본체 (타원)
-    ctx.fillStyle = "#c7d2dc";
+    // 본체
+    ctx.fillStyle = "#3a7ab8";
     ctx.beginPath();
     ctx.ellipse(cx, podCy - podH * 0.35, podW / 2, podH * 0.55, 0, 0, Math.PI * 2);
     ctx.fill();
-    // 창문 띠 (둥근 창)
-    ctx.fillStyle = "#2a4a6a";
+    // 포드 외곽선
+    ctx.strokeStyle = "#0f2a48";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // 창문 띠
+    ctx.fillStyle = "#ffe060";
     const winCount = 5;
     const winSpacing = (podW - 20) / (winCount - 1);
     for (let i = 0; i < winCount; i++) {
       ctx.beginPath();
-      ctx.arc(cx - (podW - 20) / 2 + i * winSpacing, podCy - podH * 0.35, 2.5, 0, Math.PI * 2);
+      ctx.arc(cx - (podW - 20) / 2 + i * winSpacing, podCy - podH * 0.35, 2.8, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // 짧은 첨탑
+    // 짧은 첨탑 — 짙은 금속색
     const spireBottomY = podCy - podH * 0.8;
     const spireTopY = topY + 10;
-    ctx.fillStyle = "#a8b2bc";
+    ctx.fillStyle = "#3a4048";
     ctx.beginPath();
     ctx.moveTo(cx - 4, spireBottomY);
     ctx.lineTo(cx + 4, spireBottomY);
@@ -2863,13 +2899,13 @@
       ctx.arc(cx, y + b.h * 0.64 + i * 20, 3, 0, Math.PI * 2);
       ctx.fill();
     }
-    // head (tan)
-    ctx.fillStyle = "#e6c8a0";
+    // head — 중동 피부톤 (올리브 탠, 트럼프보다 어둡게)
+    ctx.fillStyle = "#b8895c";
     ctx.beginPath();
     ctx.ellipse(cx, y + b.h * 0.4, 90, 72, 0, 0, Math.PI * 2);
     ctx.fill();
     // jowl shadow
-    ctx.fillStyle = "rgba(0,0,0,0.08)";
+    ctx.fillStyle = "rgba(0,0,0,0.12)";
     ctx.beginPath();
     ctx.ellipse(cx, y + b.h * 0.5, 80, 40, 0, 0, Math.PI * 2);
     ctx.fill();
@@ -2884,19 +2920,17 @@
     ctx.beginPath();
     ctx.arc(cx - 44, y + b.h * 0.18, 6, 0, Math.PI * 2);
     ctx.fill();
-    // squint eyes
-    ctx.strokeStyle = "#111";
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(cx - 36, y + b.h * 0.38);
-    ctx.lineTo(cx - 18, y + b.h * 0.38);
-    ctx.moveTo(cx + 18, y + b.h * 0.38);
-    ctx.lineTo(cx + 36, y + b.h * 0.38);
-    ctx.stroke();
-    // mouth
-    ctx.fillStyle = "#3a1f1f";
-    roundRect(cx - 18, y + b.h * 0.48, 36, 10, 4);
-    ctx.fill();
+    // 굵은 검은 눈썹 (페르시안 느낌 — 한 줄 라인으로 단순 유지)
+    ctx.fillStyle = "#1a1208";
+    roundRect(cx - 40, y + b.h * 0.34, 22, 5, 2); ctx.fill();
+    roundRect(cx + 18, y + b.h * 0.34, 22, 5, 2); ctx.fill();
+    // 검은 점 눈 (squint line 대신 동일 카운트)
+    ctx.fillStyle = "#111";
+    ctx.beginPath(); ctx.arc(cx - 27, y + b.h * 0.4, 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 27, y + b.h * 0.4, 3.5, 0, Math.PI * 2); ctx.fill();
+    // 짙은 콧수염 (입 rect 대신 — 동일 요소 1개)
+    ctx.fillStyle = "#1a1208";
+    roundRect(cx - 22, y + b.h * 0.47, 44, 7, 3); ctx.fill();
     // arms out
     ctx.fillStyle = "#5a5c3a";
     roundRect(cx - b.w / 2 - 10, y + b.h * 0.55, 70, 40, 14);
@@ -2904,7 +2938,7 @@
     roundRect(cx + b.w / 2 - 60, y + b.h * 0.55, 70, 40, 14);
     ctx.fill();
     // hands
-    ctx.fillStyle = "#e6c8a0";
+    ctx.fillStyle = "#b8895c";
     ctx.beginPath(); ctx.arc(cx - b.w / 2 - 6, y + b.h * 0.75, 22, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(cx + b.w / 2 + 6, y + b.h * 0.75, 22, 0, Math.PI * 2); ctx.fill();
   }
@@ -3449,7 +3483,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.41";
+  const CURRENT_VERSION = "v1.4.42";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
@@ -3491,23 +3525,35 @@
     audio.sfx.tap();
     start();
   });
-  // 프리뷰 전용: 보스전 바로가기 디버그 버튼
+  // 프리뷰 전용 디버그 패널 (보스전·크레딧 바로가기)
+  const debugPanel = document.getElementById("debug-panel");
+  if (IS_PREVIEW && debugPanel) debugPanel.classList.remove("hidden");
   const skipBossBtn = document.getElementById("skip-boss-btn");
   if (skipBossBtn) {
-    if (IS_PREVIEW) skipBossBtn.classList.remove("hidden");
     skipBossBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       audio.ensure();
       audio.sfx.tap();
       start();
-      // skip straight into boss approach
       state.distance = BOSS_DIST - 10;
       state.sungsimdangSpawned = true;
       state.stadiumSpawned = true;
       state.hanbitSpawned = true;
       state.exitGateSpawned = true;
       state.phase = "intro";
-      state.introT = INTRO_DURATION; // skip prologue animation
+      state.introT = INTRO_DURATION;
+    });
+  }
+  const skipCreditsBtn = document.getElementById("skip-credits-btn");
+  if (skipCreditsBtn) {
+    skipCreditsBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      audio.ensure();
+      audio.sfx.tap();
+      start();
+      state.running = false;
+      startOverlay.classList.add("hidden");
+      victory();
     });
   }
   document.getElementById("restart-btn").addEventListener("click", (e) => {

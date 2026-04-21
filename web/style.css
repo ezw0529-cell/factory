@@ -71,6 +71,7 @@ canvas {
   align-items: flex-start;
   gap: 4px;
   line-height: 1.1;
+  padding-top: 7px;
 }
 
 .hud-btn-col {
@@ -269,6 +270,34 @@ button:active {
   font-size: 18px;
   padding: 2px 8px;
   font-weight: 400;
+}
+
+.debug-panel {
+  display: flex;
+  gap: 6px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.debug-btn {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  padding: 4px 8px;
+  margin: 0;
+  box-shadow: none;
+  text-shadow: none;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+}
+.debug-btn:active {
+  transform: none;
+  box-shadow: none;
+  background: rgba(0, 0, 0, 0.5);
 }
 
 .preview-badge {
