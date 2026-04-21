@@ -54,10 +54,10 @@ canvas {
   left: 0;
   right: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   padding: 0 20px;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 800;
   color: #fff;
   text-shadow: 0 2px 0 #000, 0 0 8px rgba(0, 0, 0, 0.5);
@@ -65,10 +65,19 @@ canvas {
   z-index: 2;
 }
 
-.hud-right {
+.hud-left {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  line-height: 1.1;
+  padding-top: 7px;
+}
+
+.hud-btn-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .mute-btn {
@@ -261,6 +270,42 @@ button:active {
   font-size: 18px;
   padding: 2px 8px;
   font-weight: 400;
+}
+
+.debug-panel {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.debug-btn {
+  font-size: 15px;
+  padding: 10px 18px;
+  margin: 0;
+  border-radius: 10px;
+  box-shadow: 0 4px 0 #b08a12, 0 6px 14px rgba(0, 0, 0, 0.3);
+}
+.debug-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #b08a12, 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+.preview-badge {
+  position: fixed;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  left: 10px;
+  background: #c0322a;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 5px 10px;
+  border-radius: 999px;
+  z-index: 200;
+  letter-spacing: 1.2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
 #credits-overlay {

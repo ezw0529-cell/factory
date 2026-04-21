@@ -1,0 +1,98 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" aria-label="늑구런 프리뷰 앱 아이콘">
+  <defs>
+    <linearGradient id="iconBgPreview" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5a8fc4"/>
+      <stop offset="100%" stop-color="#1f3a5f"/>
+    </linearGradient>
+    <radialGradient id="faceShadePreview" cx="50%" cy="40%" r="70%">
+      <stop offset="0%" stop-color="#e8d6a8"/>
+      <stop offset="100%" stop-color="#b8996a"/>
+    </radialGradient>
+    <pattern id="hazardStripes" patternUnits="userSpaceOnUse" width="44" height="44" patternTransform="rotate(45)">
+      <rect width="44" height="44" fill="#1a1a1a"/>
+      <rect width="22" height="44" fill="#ffd84a"/>
+    </pattern>
+  </defs>
+
+  <rect width="512" height="512" rx="110" fill="url(#iconBgPreview)"/>
+
+  <circle cx="256" cy="260" r="210" fill="rgba(255,240,200,0.12)"/>
+
+  <g>
+    <path d="M120 200 L150 70 L230 180 Z" fill="#5a4530"/>
+    <path d="M392 200 L362 70 L282 180 Z" fill="#5a4530"/>
+    <path d="M140 190 L160 100 L210 180 Z" fill="#c9a077"/>
+    <path d="M372 190 L352 100 L302 180 Z" fill="#c9a077"/>
+    <path d="M160 180 L172 124 L196 176 Z" fill="#f2b8a0"/>
+    <path d="M352 180 L340 124 L316 176 Z" fill="#f2b8a0"/>
+  </g>
+
+  <ellipse cx="256" cy="280" rx="170" ry="160" fill="url(#faceShadePreview)"/>
+
+  <path d="M96 240 Q256 130 416 240 Q410 280 256 260 Q102 280 96 240"
+        fill="#7a5f3c"/>
+
+  <ellipse cx="256" cy="300" rx="130" ry="130" fill="#f3e6c2"/>
+
+  <path d="M104 300 Q76 352 116 376 Q156 370 156 324 Z" fill="#e8d4a8"/>
+  <path d="M408 300 Q436 352 396 376 Q356 370 356 324 Z" fill="#e8d4a8"/>
+
+  <ellipse cx="256" cy="356" rx="76" ry="68" fill="#fbf1d4"/>
+
+  <ellipse cx="158" cy="340" rx="22" ry="14" fill="#ff9a9a" opacity="0.55"/>
+  <ellipse cx="354" cy="340" rx="22" ry="14" fill="#ff9a9a" opacity="0.55"/>
+
+  <g>
+    <ellipse cx="190" cy="298" rx="28" ry="32" fill="#ffffff"/>
+    <ellipse cx="322" cy="298" rx="28" ry="32" fill="#ffffff"/>
+    <ellipse cx="190" cy="304" rx="22" ry="26" fill="#e69b1e"/>
+    <ellipse cx="322" cy="304" rx="22" ry="26" fill="#e69b1e"/>
+    <ellipse cx="190" cy="308" rx="11" ry="18" fill="#141005"/>
+    <ellipse cx="322" cy="308" rx="11" ry="18" fill="#141005"/>
+    <circle cx="198" cy="294" r="6" fill="#ffffff"/>
+    <circle cx="330" cy="294" r="6" fill="#ffffff"/>
+    <circle cx="184" cy="314" r="3" fill="#ffffff" opacity="0.8"/>
+    <circle cx="316" cy="314" r="3" fill="#ffffff" opacity="0.8"/>
+  </g>
+
+  <path d="M152 264 Q190 250 218 272" stroke="#3a2a18" stroke-width="9"
+        fill="none" stroke-linecap="round"/>
+  <path d="M294 272 Q322 250 360 264" stroke="#3a2a18" stroke-width="9"
+        fill="none" stroke-linecap="round"/>
+
+  <path d="M234 344 Q256 330 278 344 Q278 368 256 374 Q234 368 234 344 Z"
+        fill="#1a1a1a"/>
+
+  <path d="M256 374 Q256 398 236 402" stroke="#1a1a1a" stroke-width="6"
+        fill="none" stroke-linecap="round"/>
+  <path d="M256 374 Q256 398 276 402" stroke="#1a1a1a" stroke-width="6"
+        fill="none" stroke-linecap="round"/>
+  <path d="M248 394 Q256 410 264 394 Q264 404 256 408 Q248 404 248 394 Z"
+        fill="#ff6f8a"/>
+
+  <ellipse cx="256" cy="410" rx="30" ry="10" fill="#fff4d8"/>
+
+  <!-- DEV 배지 — 좌상단 공사 스트라이프 리본 -->
+  <g transform="translate(-10, -10) rotate(-45 120 120)">
+    <rect x="-20" y="100" width="300" height="54" fill="url(#hazardStripes)"/>
+    <rect x="-20" y="100" width="300" height="54" fill="rgba(0,0,0,0.1)"/>
+  </g>
+  <!-- DEV 텍스트 — 배지 위에 올라감 -->
+  <g transform="rotate(-45 108 108)">
+    <text x="108" y="124" text-anchor="middle"
+          font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
+          font-size="40" font-weight="900"
+          fill="#ffffff"
+          stroke="#1a1a1a" stroke-width="4" paint-order="stroke">DEV</text>
+  </g>
+
+  <!-- 우하단 🚧 공사 뱃지 (버전 힌트) -->
+  <g transform="translate(360, 380)">
+    <rect x="0" y="0" width="120" height="52" rx="26" fill="#c0322a"/>
+    <rect x="0" y="0" width="120" height="52" rx="26" fill="none"
+          stroke="#ffffff" stroke-width="3"/>
+    <text x="60" y="34" text-anchor="middle"
+          font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
+          font-size="22" font-weight="800" fill="#ffffff">PREVIEW</text>
+  </g>
+</svg>

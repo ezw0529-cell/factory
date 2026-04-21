@@ -1,10 +1,35 @@
 (() => {
+  // 프리뷰/개발 환경 식별 — 호스트가 운영 도메인이 아니면 배지 + 탭 제목 표시
+  const PROD_HOST = "neukgu-run.pages.dev";
+  const IS_PREVIEW = typeof window !== "undefined" && window.location.hostname !== PROD_HOST;
+  if (IS_PREVIEW) {
+    const badge = document.createElement("div");
+    badge.className = "preview-badge";
+    badge.textContent = "🚧 PREVIEW";
+    if (document.body) {
+      document.body.appendChild(badge);
+    } else {
+      document.addEventListener("DOMContentLoaded", () => document.body.appendChild(badge));
+    }
+    document.title = "[PREVIEW] " + document.title;
+    // 파비콘 / 홈스크린 아이콘을 프리뷰 전용으로 교체 (메인 앱 아이콘과 구분)
+    const swapIconHrefs = () => {
+      document.querySelectorAll(
+        'link[rel="icon"], link[rel="apple-touch-icon"], link[rel="shortcut icon"]'
+      ).forEach((el) => {
+        el.href = "icon-preview.svg";
+      });
+    };
+    swapIconHrefs();
+    document.addEventListener("DOMContentLoaded", swapIconHrefs);
+  }
+
   const W = 720;
   const H = 1280;
 
   const PLAYER_W = 110;
   const PLAYER_H = 130;
-  const PLAYER_Y = 980;
+  const PLAYER_Y = 1060;
   const PLAYER_MARGIN = 30;
 
   const SCROLL_START = 300;
@@ -147,13 +172,17 @@
         tone(70, 0.5, { type: "triangle", slideTo: 45, vol: 0.18 });
         noise(0.45, { filterFreq: 280, vol: 0.1 });
       },
-      twist() {
-        tone(523, 0.5, { type: "sine", slideTo: 196, vol: 0.16 });
-      },
       bossWarn() {
         tone(660, 0.1, { type: "square", vol: 0.12 });
         setTimeout(() => tone(660, 0.1, { type: "square", vol: 0.12 }), 180);
         setTimeout(() => tone(880, 0.22, { type: "square", vol: 0.12 }), 360);
+      },
+      siren() {
+        // 짧은 사이렌 — 주파수 위아래 스윕을 두 번 반복
+        tone(520, 0.22, { type: "sawtooth", slideTo: 880, vol: 0.12 });
+        setTimeout(() => tone(880, 0.22, { type: "sawtooth", slideTo: 520, vol: 0.12 }), 220);
+        setTimeout(() => tone(520, 0.22, { type: "sawtooth", slideTo: 880, vol: 0.12 }), 440);
+        setTimeout(() => tone(880, 0.26, { type: "sawtooth", slideTo: 520, vol: 0.12 }), 660);
       },
       gameOver() {
         tone(349, 0.14, { type: "sawtooth", vol: 0.14 });
@@ -296,12 +325,14 @@
   const overSubEl = document.getElementById("over-sub");
   const creditsOverlay = document.getElementById("credits-overlay");
   const creditsScroll = document.getElementById("credits-scroll");
+  const pauseOverlay = document.getElementById("pause-overlay");
 
   const BOSS_DIST = 24000;
   const INTRO_DURATION = 3.2;
 
   const state = {
     running: false,
+    paused: false,
     lastT: 0,
     scroll: SCROLL_START,
     distance: 0,
@@ -325,17 +356,18 @@
     playerYOffset: 0,
     boss: null,
     bossAnnounce: 0,
+    bossBanner: null, // { text, sub, theme, t, total }
     bullets: [],
     sungsimdangSpawned: false,
     stadiumSpawned: false,
-    femaleSpawned: false,
+    hanbitSpawned: false,
+    exitGateSpawned: false,
     breadDropQueue: 0, // number of bread items still to drop after the bakery
     breadDropTimer: 0,
     bonusTimer: 3.5,
     bonusPoints: 0,
-    goraniTimer: 9.0,
+    goraniTimer: 1.5,
     scoreFloats: [], // { x, y, t, text }
-    reveal: null, // { x, y, t } when "암컷 → 수컷" flip is playing
   };
 
   bestEl.textContent = "최고 " + state.best;
@@ -423,6 +455,36 @@
     }
   }
 
+  function spawnExitGate() {
+    // highway overhead gantry + tollgate — spans full screen width, one-time landmark
+    const w = W;
+    const h = 260;
+    state.scenery.push({ kind: "exit_gate", x: 0, y: -h - 40, w, h, label: null });
+  }
+
+  function spawnHanbit() {
+    // 한빛탑 — 아담하고 귀여운 버전 (잘 보이도록 크기 +, 인도 안쪽으로 살짝 배치)
+    const side = Math.random() < 0.5 ? "L" : "R";
+    const w = 140;
+    const h = 340;
+    const x = side === "L" ? 16 : W - w - 16;
+    const y = -h - 40;
+
+    // 한빛탑과 겹칠 수 있는 일반 건물/간판/나무는 훨씬 위로 밀어올려서 등장 구간을 비워둠
+    const hx1 = x - 12;
+    const hx2 = x + w + 12;
+    const clearY2 = y + h + 120;
+    for (let i = 0; i < state.scenery.length; i++) {
+      const s = state.scenery[i];
+      if (s.kind !== "building" && s.kind !== "sign" && s.kind !== "tree") continue;
+      if (s.x < hx2 && s.x + s.w > hx1 && s.y < clearY2) {
+        state.scenery[i] = makeScenery(-s.h - 2200 - Math.random() * 400);
+      }
+    }
+
+    state.scenery.push({ kind: "hanbit_big", x, y, w, h, side });
+  }
+
   function seedScenery() {
     const arr = [];
     for (let i = 0; i < 10; i++) arr.push(makeScenery(Math.random() * H));
@@ -448,25 +510,33 @@
     state.playerYOffset = 0;
     state.boss = null;
     state.bossAnnounce = 0;
+    state.bossBanner = null;
     state.bullets = [];
     state.sungsimdangSpawned = false;
     state.stadiumSpawned = false;
-    state.femaleSpawned = false;
+    state.hanbitSpawned = false;
+    state.exitGateSpawned = false;
     state.breadDropQueue = 0;
     state.breadDropTimer = 0;
     state.bonusTimer = 3.5;
     state.bonusPoints = 0;
-    state.goraniTimer = 9.0;
+    state.goraniTimer = 1.5;
     state.scoreFloats = [];
-    state.reveal = null;
     scoreEl.textContent = "점수 0";
+  }
+
+  function showBossBanner(text, sub, theme, total) {
+    state.bossBanner = { text, sub: sub || "", theme: theme || "warn", t: 0, total: total || 2.5 };
   }
 
   function start() {
     reset();
     state.running = true;
+    state.paused = false;
     startOverlay.classList.add("hidden");
     overOverlay.classList.add("hidden");
+    pauseOverlay.classList.add("hidden");
+    refreshPauseIcon();
     audio.ensure();
     audio.startBgm("normal");
     state.lastT = performance.now();
@@ -481,7 +551,6 @@
     else if (reason === "dart") audio.sfx.dart();
     else if (reason === "gorani") audio.sfx.gorani();
     else if (reason === "tanker") audio.sfx.tanker();
-    else if (reason === "male") audio.sfx.twist();
     else audio.sfx.gameOver();
     if (state.score > state.best) {
       state.best = state.score;
@@ -490,10 +559,14 @@
     bestEl.textContent = "최고 " + state.best;
     finalScoreEl.textContent = "점수 " + state.score;
     finalBestEl.textContent = "최고 " + state.best;
-    if (reason === "male") {
-      overTitleEl.textContent = "알고보니 수컷…!";
-      overSubEl.textContent = "\uD83D\uDC94 뜻밖의 반전. 놀랍지만 실화.";
-      overSubEl.classList.remove("hidden");
+    if (reason === "oil") {
+      overTitleEl.textContent = "해협 봉쇄를 뚫지 못했다";
+      overSubEl.textContent = "";
+      overSubEl.classList.add("hidden");
+    } else if (reason === "money") {
+      overTitleEl.textContent = "역봉쇄를 뚫지 못했다";
+      overSubEl.textContent = "";
+      overSubEl.classList.add("hidden");
     } else if (reason === "trump") {
       overTitleEl.textContent = "최종 보스에게 잡혔다";
       overSubEl.textContent = "해협은 봉쇄됐다.";
@@ -538,7 +611,7 @@
   }
 
   // --- spawning ---
-  // obstacles: 0 = person (zookeeper/capture/vet), 3 = female-wolf twist, 4 = tanker, 5 = bonus, 6 = gorani
+  // obstacles: 0 = person (zookeeper/capture/vet), 4 = tanker, 5 = bonus, 6 = gorani
   function spawnObstacle() {
     const type = 0;
     const w = 110, h = 150;
@@ -561,10 +634,11 @@
     const o = { type, sub, x, y: -h - 40, w, h, passed: false, phase: Math.random() * Math.PI * 2 };
 
     // 투척은 역할 기반 — 사육사는 안 쏨, 포획반은 그물, 수의사는 마취총
+    // 몹이 화면 상단에 등장하자마자 즉시 던져서, 탄이 몹 뒤에 남아 "제자리에 멈춘" 것처럼 보이는 문제를 방지
     if (sub === "capture") {
-      o.throws = "net"; o.thrown = false; o.throwAtY = 180 + Math.random() * 180;
+      o.throws = "net"; o.thrown = false; o.throwAtY = 20 + Math.random() * 100;
     } else if (sub === "vet") {
-      o.throws = "dart"; o.thrown = false; o.throwAtY = 180 + Math.random() * 180;
+      o.throws = "dart"; o.thrown = false; o.throwAtY = 20 + Math.random() * 100;
     }
     state.obstacles.push(o);
   }
@@ -585,12 +659,6 @@
       if (!clash) return x;
     }
     return null;
-  }
-
-  function spawnFemaleWolf() {
-    const w = 120, h = 150;
-    const x = PLAYER_MARGIN + Math.random() * (W - PLAYER_MARGIN * 2 - w);
-    state.obstacles.push({ type: 3, sub: null, x, y: -h - 40, w, h, passed: false, phase: Math.random() * Math.PI * 2 });
   }
 
   const BONUS_KINDS = ["bread", "bone", "chew"];
@@ -621,17 +689,6 @@
   // --- update ---
   function update(dt) {
     if (!state.running) return;
-
-    // 암컷→수컷 reveal pauses the world until game-over kicks in
-    if (state.reveal) {
-      state.reveal.t += dt;
-      state.shake = Math.min(20, state.shake + 30 * dt);
-      if (state.reveal.t >= 0.9) {
-        state.reveal = null;
-        gameOver("male");
-      }
-      return;
-    }
 
     // intro: torch-cutting cage bars sequence — player can't move, no spawning
     if (state.phase === "intro") {
@@ -702,18 +759,19 @@
       state.sungsimdangSpawned = true;
       spawnSungsimdang();
     }
-    // one-time female wolf trap (looks like bonus — but actually a trap)
-    if (!state.femaleSpawned && state.phase === "normal" && state.distance > 5000) {
-      state.femaleSpawned = true;
-      spawnFemaleWolf();
-    }
     // mid landmark: baseball stadium (spaced out with doubled boss timer)
     if (!state.stadiumSpawned && state.phase === "normal" && state.distance > 6500) {
       state.stadiumSpawned = true;
       spawnStadium();
     }
+    // late-mid landmark: 한빛탑 (93 엑스포 상징)
+    if (!state.hanbitSpawned && state.phase === "normal" && state.distance > 10500) {
+      state.hanbitSpawned = true;
+      spawnHanbit();
+    }
     // periodic bone/chew bonus items during normal phase
-    if (state.phase === "normal" && state.distance > 2200) {
+    // 대전 출구(톨게이트) 지나면 먹을 기회가 없으므로 보너스 스폰 중단
+    if (state.phase === "normal" && state.distance > 2200 && !state.exitGateSpawned) {
       state.bonusTimer -= dt;
       if (state.bonusTimer <= 0) {
         const sub = Math.random() < 0.5 ? "bone" : "chew";
@@ -721,12 +779,17 @@
         state.bonusTimer = 4.0 + Math.random() * 2.8;
       }
     }
-    // 고라니 돌진 — 빠르게 내려오는 장애물
-    if (state.phase === "normal" && state.distance > 2000) {
+    // 대전 시경계 톨게이트 — 호르무즈로 넘어가기 직전 landmark
+    if (!state.exitGateSpawned && state.phase === "normal" && state.distance > BOSS_DIST - 2600) {
+      state.exitGateSpawned = true;
+      spawnExitGate();
+    }
+    // 고라니 돌진 — 후반부 난이도 스파이크 (톨게이트 전까지만)
+    if (state.phase === "normal" && !state.exitGateSpawned && state.distance > 14000) {
       state.goraniTimer -= dt;
       if (state.goraniTimer <= 0) {
         spawnGorani();
-        state.goraniTimer = 7 + Math.random() * 4;
+        state.goraniTimer = 3.5 + Math.random() * 2.0;
       }
     }
 
@@ -734,7 +797,6 @@
     if (state.phase === "normal" && state.distance >= BOSS_DIST) {
       state.phase = "approach";
       state.phaseT = 0;
-      state.bossAnnounce = 2.5;
       audio.sfx.bossWarn();
       audio.startBgm("boss");
       // clear any land obstacles — the world changes to the strait
@@ -744,22 +806,35 @@
       state.spawnTimer = 0.9;
     }
     if (state.bossAnnounce > 0) state.bossAnnounce = Math.max(0, state.bossAnnounce - dt);
+    if (state.bossBanner) {
+      state.bossBanner.t += dt;
+      if (state.bossBanner.t >= state.bossBanner.total) state.bossBanner = null;
+    }
     if (state.phase === "approach" || state.phase === "boss" || state.phase === "victory") {
       state.phaseT += dt;
     }
     if (state.phase === "approach") {
+      // 페이즈 1 시그널 배너 + 사이렌
+      if (state.phaseT < dt * 2 && !state.bossBanner) {
+        showBossBanner("⚓ 해협 봉쇄", "", "warn", 2.8);
+        audio.sfx.siren();
+      }
       if (state.phaseT >= 6.0) {
         state.phase = "boss";
         state.phaseT = 0;
         state.boss = {
+          bossPhase: 1,
           x: W / 2,
-          y: -200,
-          baseX: W / 2,
-          w: 260,
-          h: 230,
-          vy: 85,
-          wobbleT: 0,
-          fireTimer: 0.8,
+          y: 280,
+          w: 240,
+          h: 260,
+          vx: 180,
+          vy: 90,
+          hp: 100,
+          hpMax: 100,
+          fireTimer: 1.0,
+          entryT: 0,
+          transitionT: 0,
           dead: false,
           deadT: 0,
         };
@@ -767,7 +842,8 @@
     }
 
     // spawn (land obstacles in normal, tankers during approach/boss)
-    if (state.phase === "normal") {
+    // 톨게이트 지나면 빌런 스폰 중단 — 조용한 도로로 호르무즈까지 배웅
+    if (state.phase === "normal" && !state.exitGateSpawned) {
       state.spawnTimer -= dt;
       if (state.spawnTimer <= 0) {
         spawnObstacle();
@@ -810,65 +886,130 @@
     }
     state.obstacles = state.obstacles.filter((o) => o.y < H + 60);
 
-    // boss: slow descent through center, fire while high, then drop
+    // boss: 2-phase fight — Iran (phase 1, 기름통) → Trump (phase 2, 돈뭉치)
+    // boss moves up/down/left/right inside the upper zone; HP drains over time.
     if (state.phase === "boss" && state.boss) {
       const b = state.boss;
-      const KILL_LINE = H * 0.42;
-      if (!b.dead) {
-        b.wobbleT += dt;
-        b.x = b.baseX + Math.sin(b.wobbleT * 0.7) * 110;
-        b.y += b.vy * dt;
-        // trigger mario-death when crossing the kill line
-        if (b.y > KILL_LINE) {
-          b.dead = true;
+      const BOSS_MIN_X = 140, BOSS_MAX_X = W - 140;
+      // 두 보스 모두 수면 위까지만 내려오도록 제한 (수면 = H*0.55, 보스 h=260)
+      const BOSS_MIN_Y = 220, BOSS_MAX_Y = Math.floor(H * 0.55 - 260 * 0.9);
+
+      if (b.transitionT > 0) {
+        // 페이즈 1 → 페이즈 2 핸드오프: 수문장 퇴장 후 역봉쇄 시그널 깜빡깜빡 → 황금머리 입장
+        b.transitionT -= dt;
+        // 페이즈 1 보스는 화면 밖으로 치워둠 (drawBoss 호출돼도 안 보임)
+        b.y = H + 400;
+        if (b.transitionT <= 0) {
+          b.bossPhase = 2;
+          b.hp = 100;
+          b.hpMax = 100;
+          b.fireTimer = 1.0;
+          b.entryT = 0;
+          b.y = 280;
+          b.x = W / 2;
+          b.vx = 200;
+          b.vy = 80;
+          b.dead = false;
           b.deadT = 0;
-          audio.sfx.victory();
-          audio.startBgm("victory");
+        }
+      } else if (!b.dead) {
+        b.entryT += dt;
+        const ENTRY_DURATION = 2.5;
+        if (b.entryT < ENTRY_DURATION) {
+          // 등장 연출 — 위에서 천천히 내려오는 애니메이션 (움직임·공격·HP 드레인 모두 스킵)
+          const t = b.entryT / ENTRY_DURATION;
+          const ease = 1 - Math.pow(1 - t, 3); // easeOutCubic — 더 부드럽게
+          b.x = W / 2;
+          b.y = -b.h + (280 + b.h) * ease;
+          b.fireTimer = 1.0;
         } else {
-          // only fire while above the kill line
+          // up/down/left/right drift with bounce + jitter — 페이즈 2는 속도 증가
+          const moveMult = b.bossPhase === 2 ? 1.15 : 1.0;
+          b.x += b.vx * moveMult * dt;
+          b.y += b.vy * moveMult * dt;
+          if (b.x < BOSS_MIN_X) { b.x = BOSS_MIN_X; b.vx = Math.abs(b.vx); }
+          if (b.x > BOSS_MAX_X) { b.x = BOSS_MAX_X; b.vx = -Math.abs(b.vx); }
+          if (b.y < BOSS_MIN_Y) { b.y = BOSS_MIN_Y; b.vy = Math.abs(b.vy); }
+          if (b.y > BOSS_MAX_Y) { b.y = BOSS_MAX_Y; b.vy = -Math.abs(b.vy); }
+          // 방향 전환 빈도 — 페이즈 2는 더 불규칙하게
+          const flipRate = b.bossPhase === 2 ? 0.022 : 0.012;
+          if (Math.random() < flipRate) b.vx = (Math.random() * 2 - 1) * (b.bossPhase === 2 ? 260 : 240);
+          if (Math.random() < flipRate) b.vy = (Math.random() * 2 - 1) * (b.bossPhase === 2 ? 150 : 130);
+
+          // HP drain — 페이즈 1 ~15s, 페이즈 2 ~18s (최종 보스라 조금 더 오래 버텨야 함)
+          const drainDuration = b.bossPhase === 2 ? 18 : 15;
+          const drainRate = b.hpMax / drainDuration;
+          b.hp = Math.max(0, b.hp - drainRate * dt);
+
+          // fire projectiles at the player
           b.fireTimer -= dt;
           if (b.fireTimer <= 0) {
             const bx = b.x;
-            const by = b.y + b.h * 0.5;
+            const by = b.y + b.h * 0.55;
             const dx = p.x - bx;
             const dy = PLAYER_Y - by;
             const mag = Math.hypot(dx, dy) || 1;
-            const speed = 520;
+            // 페이즈 2는 단발이지만 더 빠른 탄속 + 더 높은 연사력
+            const speed = b.bossPhase === 1 ? 480 : 620;
+            const kind = b.bossPhase === 1 ? "oilbarrel" : "money";
+            const r = b.bossPhase === 1 ? 26 : 24;
             state.bullets.push({
               x: bx, y: by,
               vx: dx / mag * speed,
               vy: dy / mag * speed,
-              r: 26,
-              spin: 0,
+              r, spin: 0, kind,
             });
             audio.sfx.bossFire();
-            b.fireTimer = 0.8;
+            b.fireTimer = b.bossPhase === 1 ? 1.05 : 0.5;
+          }
+
+          // HP 소진 → 두 보스 모두 쓰러지는 연출 먼저 (마리오식 스핀+낙하)
+          if (b.hp <= 0) {
+            b.dead = true;
+            b.deadT = 0;
+            state.bullets = [];
+            if (b.bossPhase === 2) {
+              audio.sfx.victory();
+              audio.startBgm("victory");
+            } else {
+              audio.sfx.bossFire();
+            }
           }
         }
       } else {
-        // mario-death sequence: brief hover then fast drop
+        // 마리오식 스핀+낙하
         b.deadT += dt;
         if (b.deadT < 0.35) {
           b.y -= 260 * dt;
         } else {
           b.y += 1700 * dt * Math.min(1, (b.deadT - 0.35) * 3);
         }
-        // once death animation is done, just call it a win
         if (b.deadT > 0.85) {
-          state.phase = "outro";
-          state.outroT = 0;
-          state.boss = null;
-          state.bullets = [];
-          state.obstacles = [];
-          return;
+          if (b.bossPhase === 1) {
+            // 수문장 퇴장 완료 → 역봉쇄 시그널 깜박 후 황금머리 등장
+            b.transitionT = 3.0;
+            showBossBanner("💵 역봉쇄", "", "counter", 2.8);
+            audio.sfx.siren();
+          } else {
+            state.phase = "outro";
+            state.outroT = 0;
+            state.boss = null;
+            state.bullets = [];
+            state.obstacles = [];
+            return;
+          }
         }
       }
     }
 
     // bullets update
+    // net/dart는 월드 공간의 물체 — 세계 스크롤과 함께 내려가야 "뒤에 남겨진/올라가는" 것처럼 보이지 않음
     for (const bt of state.bullets) {
       bt.x += bt.vx * dt;
       bt.y += bt.vy * dt;
+      if (bt.kind === "net" || bt.kind === "dart") {
+        bt.y += state.scroll * dt;
+      }
       bt.spin += dt * 6;
     }
     state.bullets = state.bullets.filter(
@@ -880,7 +1021,11 @@
       const dx = bt.x - p.x;
       const dy = bt.y - PLAYER_Y;
       if (Math.hypot(dx, dy) < bt.r + 24) {
-        const reason = (bt.kind === "net" || bt.kind === "dart") ? bt.kind : "trump";
+        let reason;
+        if (bt.kind === "net" || bt.kind === "dart") reason = bt.kind;
+        else if (bt.kind === "oilbarrel") reason = "oil";
+        else if (bt.kind === "money") reason = "money";
+        else reason = "trump";
         gameOver(reason);
         return;
       }
@@ -890,10 +1035,7 @@
     for (let i = 0; i < state.obstacles.length; i++) {
       const o = state.obstacles[i];
       if (px1 < o.x + o.w - 14 && px2 > o.x + 14 && py1 < o.y + o.h - 14 && py2 > o.y + 14) {
-        if (o.type === 3) {
-          state.reveal = { x: o.x + o.w / 2, y: o.y + o.h / 2, t: 0 };
-          return;
-        } else if (o.type === 5) {
+        if (o.type === 5) {
           // bonus item — +100 score, floating popup, no death
           state.bonusPoints += 100;
           state.score += 100;
@@ -1045,18 +1187,7 @@
       ctx.arc(W - 63, H * 0.1 - 24, 10, 0, Math.PI * 2);
       ctx.fill();
 
-      // banner at top
-      ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
-      ctx.fillRect(80, 30, W - 160, 60);
-      ctx.strokeStyle = "#ffd84a"; ctx.lineWidth = 3;
-      ctx.strokeRect(80, 30, W - 160, 60);
-      ctx.fillStyle = "#ffd84a";
-      ctx.font = "bold 30px 'Apple SD Gothic Neo', sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("호르무즈 해협", W / 2, 58);
-      ctx.fillStyle = "#fff";
-      ctx.font = "bold 15px sans-serif";
-      ctx.fillText("STRAIT OF HORMUZ", W / 2, 78);
+      // 호르무즈 해협 배너 — 제거 (봉쇄 시그널로 이미 인지 가능)
     } else {
       // Daejeon city — sidewalks + asphalt road
       ctx.fillStyle = "#c9c4b8";
@@ -1320,10 +1451,37 @@
     const vRight = Math.min(x + w, W - 4);
     const vCenter = (vLeft + vRight) / 2;
 
-    // vertical 선심당 signboard — anchor on the inward (visible) edge
+    // signboard geometry (drawn after windows so it sits on top)
     const sbW = 36;
     const sbX = onLeft ? vRight - sbW - 4 : vLeft + 4;
     const sbY = y + 160;
+
+    // arched windows first — signboard/banner will overlay on top to avoid text being covered
+    for (let r = 0; r < 2; r++) {
+      for (let c = 0; c < 2; c++) {
+        const wx = x + 18 + c * ((w - 80) / 2);
+        const wy = y + 250 + r * 80;
+        // skip windows that would sit under the vertical signboard strip
+        if (wx + 32 > sbX - 2 && wx < sbX + sbW + 2) continue;
+        ctx.fillStyle = "#2a2a30";
+        ctx.beginPath();
+        ctx.moveTo(wx, wy + 56);
+        ctx.lineTo(wx, wy + 16);
+        ctx.quadraticCurveTo(wx + 16, wy - 6, wx + 32, wy + 16);
+        ctx.lineTo(wx + 32, wy + 56);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#e8d8b8";
+        ctx.fillRect(wx + 3, wy + 18, 26, 34);
+        ctx.strokeStyle = "#3a2a20"; ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(wx + 16, wy + 14); ctx.lineTo(wx + 16, wy + 54);
+        ctx.moveTo(wx + 3, wy + 34); ctx.lineTo(wx + 29, wy + 34);
+        ctx.stroke();
+      }
+    }
+
+    // vertical 빵맛집 signboard — painted on top of any leftover window geometry
     ctx.fillStyle = "#1a1a1a";
     roundRect(sbX, sbY, sbW, 220, 3); ctx.fill();
     ctx.fillStyle = "#ffd84a";
@@ -1346,29 +1504,6 @@
     ctx.font = "bold 20px 'Apple SD Gothic Neo', sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("갓 구운 빵", bnCx, y + 207);
-
-    // arched windows (2 rows of 2, larger for the bigger facade)
-    for (let r = 0; r < 2; r++) {
-      for (let c = 0; c < 2; c++) {
-        const wx = x + 18 + c * ((w - 80) / 2);
-        const wy = y + 250 + r * 80;
-        ctx.fillStyle = "#2a2a30";
-        ctx.beginPath();
-        ctx.moveTo(wx, wy + 56);
-        ctx.lineTo(wx, wy + 16);
-        ctx.quadraticCurveTo(wx + 16, wy - 6, wx + 32, wy + 16);
-        ctx.lineTo(wx + 32, wy + 56);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = "#e8d8b8";
-        ctx.fillRect(wx + 3, wy + 18, 26, 34);
-        ctx.strokeStyle = "#3a2a20"; ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(wx + 16, wy + 14); ctx.lineTo(wx + 16, wy + 54);
-        ctx.moveTo(wx + 3, wy + 34); ctx.lineTo(wx + 29, wy + 34);
-        ctx.stroke();
-      }
-    }
 
     // awnings at bottom (dark gray)
     ctx.fillStyle = "#2a2a30";
@@ -1640,11 +1775,203 @@
     }
   }
 
+  function drawExitGate(s) {
+    // Highway overhead gantry + tollgate spanning the full road.
+    // Marks the edge of Daejeon — the road gives way to sea after this.
+    const x = s.x, y = s.y, w = s.w, h = s.h;
+    // ground shadow across the road
+    ctx.fillStyle = "rgba(0,0,0,0.18)";
+    ctx.fillRect(x, y + h - 16, w, 14);
+
+    // two side pylons (on the sidewalks)
+    const pylW = 34;
+    const pylH = 190;
+    const pylY = y + 30;
+    const leftX = x + 8;
+    const rightX = x + w - pylW - 8;
+    ctx.fillStyle = "#8a8f95";
+    ctx.fillRect(leftX, pylY, pylW, pylH);
+    ctx.fillRect(rightX, pylY, pylW, pylH);
+    // pylon caps
+    ctx.fillStyle = "#5a6068";
+    ctx.fillRect(leftX - 4, pylY, pylW + 8, 10);
+    ctx.fillRect(rightX - 4, pylY, pylW + 8, 10);
+    // pylon stripes (reflective tape)
+    ctx.fillStyle = "#ffcc33";
+    for (let i = 0; i < 3; i++) {
+      ctx.fillRect(leftX, pylY + 40 + i * 36, pylW, 6);
+      ctx.fillRect(rightX, pylY + 40 + i * 36, pylW, 6);
+    }
+
+    // overhead beam across the full road
+    const beamY = y + 20;
+    const beamH = 22;
+    ctx.fillStyle = "#4a5058";
+    ctx.fillRect(x, beamY, w, beamH);
+    ctx.fillStyle = "#2a2e34";
+    ctx.fillRect(x, beamY + beamH - 4, w, 4);
+
+    // big green highway sign on the beam
+    const sgnW = w * 0.64;
+    const sgnH = 110;
+    const sgnX = x + (w - sgnW) / 2;
+    const sgnY = beamY + beamH + 4;
+    ctx.fillStyle = "#1f6f3e";
+    roundRect(sgnX, sgnY, sgnW, sgnH, 6); ctx.fill();
+    // white inner border
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+    ctx.strokeRect(sgnX + 5, sgnY + 5, sgnW - 10, sgnH - 10);
+    // main text
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "bold 32px 'Apple SD Gothic Neo', sans-serif";
+    ctx.fillText("안녕히 가세요", sgnX + sgnW / 2, sgnY + 34);
+    ctx.font = "bold 22px 'Apple SD Gothic Neo', sans-serif";
+    ctx.fillText("대전광역시", sgnX + sgnW / 2, sgnY + 66);
+    // sub line
+    ctx.font = "bold 14px ui-monospace, 'SF Mono', Menlo, monospace";
+    ctx.fillStyle = "#cfe4d6";
+    ctx.fillText("NEXT EXIT → 호르무즈", sgnX + sgnW / 2, sgnY + 92);
+    ctx.textBaseline = "alphabetic";
+
+    // small side arrows on the beam edges
+    ctx.fillStyle = "#ffd84a";
+    ctx.beginPath();
+    ctx.moveTo(x + pylW + 24, beamY + beamH / 2 - 6);
+    ctx.lineTo(x + pylW + 44, beamY + beamH / 2);
+    ctx.lineTo(x + pylW + 24, beamY + beamH / 2 + 6);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x + w - pylW - 24, beamY + beamH / 2 - 6);
+    ctx.lineTo(x + w - pylW - 44, beamY + beamH / 2);
+    ctx.lineTo(x + w - pylW - 24, beamY + beamH / 2 + 6);
+    ctx.closePath(); ctx.fill();
+  }
+
+  function drawHanbitBig(s) {
+    // 한빛탑 — 아담/귀여운 chibi 버전 (둥근 베이스·통통한 포드·짧은 첨탑)
+    const cx = s.x + s.w / 2;
+    const baseY = s.y + s.h;
+    const topY = s.y;
+
+    // 바닥 그림자
+    ctx.fillStyle = "rgba(0,0,0,0.22)";
+    ctx.beginPath();
+    ctx.ellipse(cx, baseY - 4, s.w * 0.5, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 둥근 돌 베이스 — 원래의 natural stone 톤 + 진한 외곽선
+    const baseW = s.w * 0.82;
+    const baseH = 20;
+    ctx.fillStyle = "#8a7c66";
+    roundRect(cx - baseW / 2, baseY - baseH, baseW, baseH, 6); ctx.fill();
+    ctx.strokeStyle = "#2a2218";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = "#a69780";
+    ctx.fillRect(cx - baseW / 2 + 4, baseY - baseH + 3, baseW - 8, 2);
+
+    // 통통한 샤프트 — cream 톤 유지, 외곽선만 진하게
+    const shaftBottomW = s.w * 0.38;
+    const shaftTopW = s.w * 0.26;
+    const shaftBottomY = baseY - baseH;
+    const shaftTopY = topY + s.h * 0.34;
+    ctx.fillStyle = "#dcd4c4";
+    ctx.beginPath();
+    ctx.moveTo(cx - shaftBottomW / 2, shaftBottomY);
+    ctx.lineTo(cx + shaftBottomW / 2, shaftBottomY);
+    ctx.lineTo(cx + shaftTopW / 2, shaftTopY);
+    ctx.lineTo(cx - shaftTopW / 2, shaftTopY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "#2a2218";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // 샤프트 오른쪽 음영
+    ctx.fillStyle = "rgba(0,0,0,0.14)";
+    ctx.fillRect(cx + shaftTopW / 2 - 3, shaftTopY, 3, shaftBottomY - shaftTopY);
+
+    // 둥근 관측 포드 — 원래의 metallic gray-blue + 진한 외곽선
+    const podCy = shaftTopY - 2;
+    const podW = s.w * 0.72;
+    const podH = 22;
+    // 아랫면
+    ctx.fillStyle = "#9aa6b0";
+    ctx.beginPath();
+    ctx.ellipse(cx, podCy, podW / 2, podH * 0.45, 0, 0, Math.PI);
+    ctx.fill();
+    ctx.strokeStyle = "#2a2a33";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // 본체
+    ctx.fillStyle = "#c7d2dc";
+    ctx.beginPath();
+    ctx.ellipse(cx, podCy - podH * 0.35, podW / 2, podH * 0.55, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // 창문 띠
+    ctx.fillStyle = "#2a4a6a";
+    const winCount = 5;
+    const winSpacing = (podW - 20) / (winCount - 1);
+    for (let i = 0; i < winCount; i++) {
+      ctx.beginPath();
+      ctx.arc(cx - (podW - 20) / 2 + i * winSpacing, podCy - podH * 0.35, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 짧은 첨탑 — 원래 실버톤 + 진한 외곽선
+    const spireBottomY = podCy - podH * 0.8;
+    const spireTopY = topY + 10;
+    ctx.fillStyle = "#a8b2bc";
+    ctx.beginPath();
+    ctx.moveTo(cx - 4, spireBottomY);
+    ctx.lineTo(cx + 4, spireBottomY);
+    ctx.lineTo(cx, spireTopY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "#2a2a33";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // 끝에 동그란 빨간 램프 (큼직하게 귀엽게)
+    const blink = (Math.floor(state.distance / 40) % 2) === 0;
+    ctx.fillStyle = blink ? "#ff4030" : "#802018";
+    ctx.beginPath();
+    ctx.arc(cx, spireTopY, 4, 0, Math.PI * 2);
+    ctx.fill();
+    if (blink) {
+      ctx.fillStyle = "rgba(255,120,100,0.35)";
+      ctx.beginPath();
+      ctx.arc(cx, spireTopY, 8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 명판
+    const plqW = 56, plqH = 18;
+    const plqX = cx - plqW / 2;
+    const plqY = baseY - baseH - plqH - 2;
+    ctx.fillStyle = "#2a2a2a";
+    roundRect(plqX - 2, plqY - 2, plqW + 4, plqH + 4, 4); ctx.fill();
+    ctx.fillStyle = "#ffd84a";
+    roundRect(plqX, plqY, plqW, plqH, 4); ctx.fill();
+    ctx.fillStyle = "#1a1a1a";
+    ctx.font = "bold 11px 'Apple SD Gothic Neo', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("한빛탑", cx, plqY + plqH / 2);
+    ctx.textBaseline = "alphabetic";
+  }
+
   function drawScenery(s) {
     if (s.kind === "sungsimdang_big") {
       drawSungsimdangBig(s);
     } else if (s.kind === "stadium_big") {
       drawStadiumBig(s);
+    } else if (s.kind === "hanbit_big") {
+      drawHanbitBig(s);
+    } else if (s.kind === "exit_gate") {
+      drawExitGate(s);
     } else if (s.kind === "sign") {
       // green street sign on pole
       ctx.fillStyle = "#4a4a4a";
@@ -1785,32 +2112,173 @@
       drawDart(bt);
       return;
     }
+    if (bt.kind === "money") {
+      drawMoneyBundle(bt);
+      return;
+    }
+    drawOilBarrel(bt);
+  }
+
+  function drawMoneyBundle(bt) {
+    // 100달러 지폐 묶음 — 종이 스택 + 십자 밴드
+    const r = bt.r;
+    const w = r * 2.3;
+    const h = r * 1.35;
     ctx.save();
     ctx.translate(bt.x, bt.y);
-    ctx.rotate(bt.spin);
-    // coin outer
-    ctx.fillStyle = "#e0a817";
+    ctx.rotate(bt.spin * 0.35);
+
+    // 그림자
+    ctx.fillStyle = "rgba(0,0,0,0.22)";
     ctx.beginPath();
-    ctx.arc(0, 0, bt.r, 0, Math.PI * 2);
+    ctx.ellipse(2, h / 2 + 6, w / 2, 4, 0, 0, Math.PI * 2);
     ctx.fill();
-    // inner rim
-    ctx.fillStyle = "#f7d34a";
+
+    // 뒷쪽 지폐 (스택 느낌)
+    ctx.fillStyle = "#c8e4c0";
+    ctx.fillRect(-w / 2 + 3, -h / 2 - 3, w, h);
+    ctx.fillStyle = "#d0e8c8";
+    ctx.fillRect(-w / 2, -h / 2, w, h);
+
+    // 본체 지폐 — 민트 그린
+    const bill = ctx.createLinearGradient(-w / 2, 0, w / 2, 0);
+    bill.addColorStop(0, "#6aa86a");
+    bill.addColorStop(0.5, "#8ac48a");
+    bill.addColorStop(1, "#5a9a5a");
+    ctx.fillStyle = bill;
+    ctx.fillRect(-w / 2, -h / 2, w, h);
+
+    // 내부 테두리
+    ctx.strokeStyle = "rgba(20, 60, 20, 0.55)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-w / 2 + 3, -h / 2 + 3, w - 6, h - 6);
+
+    // 가운데 동그라미 초상 자리
+    ctx.fillStyle = "#d0e8c8";
     ctx.beginPath();
-    ctx.arc(0, 0, bt.r - 4, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, w * 0.22, h * 0.34, 0, 0, Math.PI * 2);
     ctx.fill();
-    // edge darker
-    ctx.strokeStyle = "#8a5a0a"; ctx.lineWidth = 2;
+    ctx.strokeStyle = "#2a5a2a";
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.arc(0, 0, bt.r - 1, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, w * 0.22, h * 0.34, 0, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.restore();
-    // dollar sign (not rotated — always readable)
-    ctx.fillStyle = "#2a5a2a";
-    ctx.font = `bold ${Math.round(bt.r * 1.3)}px sans-serif`;
+    // 초상 실루엣
+    ctx.fillStyle = "#5a8a5a";
+    ctx.beginPath();
+    ctx.arc(0, -h * 0.05, h * 0.14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(-h * 0.18, h * 0.06, h * 0.36, h * 0.2);
+
+    // 모서리 숫자
+    ctx.fillStyle = "#ffd84a";
+    ctx.font = `bold ${Math.max(9, Math.round(r * 0.45))}px sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("$", bt.x, bt.y);
+    ctx.fillText("100", -w / 2 + 12, -h / 2 + 8);
+    ctx.fillText("100", w / 2 - 12, h / 2 - 8);
+
+    // 밴드 (묶음끈) — 노란색 가로 띠
+    ctx.fillStyle = "#ffd84a";
+    ctx.fillRect(-w / 2 - 2, -h * 0.18, w + 4, h * 0.2);
+    ctx.fillStyle = "#b08a12";
+    ctx.fillRect(-w / 2 - 2, -h * 0.18, w + 4, 2);
+    ctx.fillRect(-w / 2 - 2, -h * 0.18 + h * 0.18, w + 4, 2);
+    // 밴드 위 $ 마크
+    ctx.fillStyle = "#1a1a1a";
+    ctx.font = `bold ${Math.max(10, Math.round(r * 0.55))}px sans-serif`;
+    ctx.fillText("$ $ $", 0, -h * 0.08);
     ctx.textBaseline = "alphabetic";
+
+    ctx.restore();
+  }
+
+  function drawOilBarrel(bt) {
+    // 측면 실린더 뷰 — 굴러오는 느낌을 위해 bt.spin 으로 tumble
+    const r = bt.r;
+    const bodyW = r * 1.7;   // 좁은 쪽 (원통 폭)
+    const bodyH = r * 2.2;   // 긴 쪽 (원통 높이)
+    ctx.save();
+    ctx.translate(bt.x, bt.y);
+    ctx.rotate(bt.spin * 0.6);
+
+    // 그림자 (아래쪽 살짝)
+    ctx.fillStyle = "rgba(0,0,0,0.22)";
+    ctx.beginPath();
+    ctx.ellipse(2, bodyH / 2 + 6, bodyW / 2, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 원통 몸통 (주황)
+    const bx = -bodyW / 2;
+    const by = -bodyH / 2;
+    const grad = ctx.createLinearGradient(bx, 0, bx + bodyW, 0);
+    grad.addColorStop(0, "#8a2a0a");
+    grad.addColorStop(0.4, "#d8602a");
+    grad.addColorStop(0.7, "#e8884a");
+    grad.addColorStop(1, "#7a240a");
+    ctx.fillStyle = grad;
+    ctx.fillRect(bx, by + 4, bodyW, bodyH - 8);
+
+    // 위/아래 뚜껑 (타원으로 3D 실린더 느낌)
+    ctx.fillStyle = "#b04018";
+    ctx.beginPath();
+    ctx.ellipse(0, by + 4, bodyW / 2, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#5a1808";
+    ctx.beginPath();
+    ctx.ellipse(0, by + bodyH - 4, bodyW / 2, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // 위 뚜껑 하이라이트
+    ctx.fillStyle = "#f0a070";
+    ctx.beginPath();
+    ctx.ellipse(0, by + 4, bodyW / 2 - 4, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // 마개 (bunghole)
+    ctx.fillStyle = "#2a0a04";
+    ctx.beginPath();
+    ctx.arc(bodyW / 4, by + 4, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 가로 리브(골) 2줄 — 기름통 정체성의 핵심
+    ctx.strokeStyle = "#5a1808";
+    ctx.lineWidth = 2;
+    const rib1 = by + bodyH * 0.32;
+    const rib2 = by + bodyH * 0.68;
+    ctx.beginPath();
+    ctx.moveTo(bx + 2, rib1);
+    ctx.lineTo(bx + bodyW - 2, rib1);
+    ctx.moveTo(bx + 2, rib2);
+    ctx.lineTo(bx + bodyW - 2, rib2);
+    ctx.stroke();
+    // 리브 하이라이트
+    ctx.strokeStyle = "rgba(255, 200, 150, 0.5)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(bx + 2, rib1 - 2);
+    ctx.lineTo(bx + bodyW - 2, rib1 - 2);
+    ctx.moveTo(bx + 2, rib2 - 2);
+    ctx.lineTo(bx + bodyW - 2, rib2 - 2);
+    ctx.stroke();
+
+    // OIL 라벨 — 가운데 칸
+    ctx.fillStyle = "#1a0a04";
+    const labelW = bodyW * 0.7;
+    const labelH = (rib2 - rib1) * 0.6;
+    const labelX = -labelW / 2;
+    const labelY = (rib1 + rib2) / 2 - labelH / 2;
+    ctx.fillRect(labelX, labelY, labelW, labelH);
+    ctx.fillStyle = "#ffd84a";
+    ctx.font = `bold ${Math.max(10, Math.round(r * 0.7))}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("OIL", 0, (rib1 + rib2) / 2);
+    ctx.textBaseline = "alphabetic";
+
+    // 세로 하이라이트 (금속 반사)
+    ctx.fillStyle = "rgba(255, 230, 190, 0.28)";
+    ctx.fillRect(bx + 4, by + 8, 4, bodyH - 16);
+
+    ctx.restore();
   }
 
   function drawDart(bt) {
@@ -1966,78 +2434,6 @@
   function drawObstacle(o) {
     if (o.type === 0) {
       drawPerson(o);
-    } else if (o.type === 3) {
-      // "female" wolf bait
-      const cx = o.x + o.w / 2;
-      const cy = o.y + o.h / 2;
-      // hearts aura
-      ctx.fillStyle = "rgba(255, 120, 160, 0.55)";
-      const t = performance.now() / 500 + o.phase;
-      for (let i = 0; i < 4; i++) {
-        const a = t + i * Math.PI / 2;
-        const hx = cx + Math.cos(a) * (o.w / 2 + 14);
-        const hy = cy + Math.sin(a) * (o.h / 2 + 10);
-        ctx.beginPath();
-        ctx.arc(hx - 6, hy, 8, 0, Math.PI * 2);
-        ctx.arc(hx + 6, hy, 8, 0, Math.PI * 2);
-        ctx.moveTo(hx - 14, hy + 2);
-        ctx.lineTo(hx, hy + 18);
-        ctx.lineTo(hx + 14, hy + 2);
-        ctx.fill();
-      }
-      // wolf (pink-tinted)
-      ctx.fillStyle = "#c79a8a";
-      ctx.beginPath();
-      ctx.ellipse(cx, cy + 20, o.w * 0.36, o.h * 0.32, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.ellipse(cx, cy - 28, o.w * 0.32, o.h * 0.27, 0, 0, Math.PI * 2);
-      ctx.fill();
-      // ears
-      ctx.fillStyle = "#a07868";
-      ctx.beginPath();
-      ctx.moveTo(cx - 26, cy - 40); ctx.lineTo(cx - 14, cy - 62); ctx.lineTo(cx - 6, cy - 36); ctx.closePath(); ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(cx + 26, cy - 40); ctx.lineTo(cx + 14, cy - 62); ctx.lineTo(cx + 6, cy - 36); ctx.closePath(); ctx.fill();
-      // pink ribbon on head
-      ctx.fillStyle = "#ff6fa1";
-      ctx.beginPath();
-      ctx.moveTo(cx - 2, cy - 52); ctx.lineTo(cx - 18, cy - 58); ctx.lineTo(cx - 18, cy - 44); ctx.closePath(); ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(cx + 2, cy - 52); ctx.lineTo(cx + 18, cy - 58); ctx.lineTo(cx + 18, cy - 44); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = "#ff3f80";
-      ctx.beginPath(); ctx.arc(cx, cy - 51, 5, 0, Math.PI * 2); ctx.fill();
-      // eyelashes + blush
-      ctx.strokeStyle = "#111"; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(cx - 16, cy - 28); ctx.lineTo(cx - 22, cy - 34); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(cx + 16, cy - 28); ctx.lineTo(cx + 22, cy - 34); ctx.stroke();
-      ctx.fillStyle = "#111";
-      ctx.beginPath(); ctx.arc(cx - 14, cy - 26, 3, 0, Math.PI * 2); ctx.arc(cx + 14, cy - 26, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "rgba(255, 120, 140, 0.6)";
-      ctx.beginPath(); ctx.arc(cx - 22, cy - 18, 6, 0, Math.PI * 2); ctx.arc(cx + 22, cy - 18, 6, 0, Math.PI * 2); ctx.fill();
-      // snout
-      ctx.fillStyle = "#e6c4b4";
-      ctx.beginPath(); ctx.ellipse(cx, cy - 10, 12, 9, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "#111";
-      ctx.beginPath(); ctx.ellipse(cx, cy - 14, 5, 3.5, 0, 0, Math.PI * 2); ctx.fill();
-      // ♀ symbol floating above head
-      const sy = cy - 78 + Math.sin(performance.now() / 300 + o.phase) * 4;
-      ctx.fillStyle = "#ff3f80";
-      ctx.beginPath();
-      ctx.arc(cx, sy, 14, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#ffffff";
-      ctx.beginPath();
-      ctx.arc(cx, sy, 10, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "#ff3f80"; ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(cx, sy, 7, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(cx, sy + 7); ctx.lineTo(cx, sy + 18);
-      ctx.moveTo(cx - 5, sy + 13); ctx.lineTo(cx + 5, sy + 13);
-      ctx.stroke();
     } else if (o.type === 4) {
       drawTanker(o);
     } else if (o.type === 5) {
@@ -2157,7 +2553,7 @@
     const cx = o.x + o.w / 2;
     const cy = o.y + o.h / 2;
     const t = performance.now() / 500 + o.phase;
-    // pink heart aura — intentionally matches the female wolf decoy's visual style
+    // pink heart aura around bonus pickups
     ctx.fillStyle = "rgba(255, 120, 160, 0.55)";
     for (let i = 0; i < 4; i++) {
       const a = t + i * Math.PI / 2;
@@ -2453,8 +2849,6 @@
     const b = state.boss;
     if (!b) return;
     ctx.save();
-    const cx = b.x;
-    let y = b.y;
     if (b.dead) {
       // rotate + wobble during fall
       const rot = Math.min(b.deadT * 2.2, Math.PI);
@@ -2462,6 +2856,97 @@
       ctx.rotate(rot);
       ctx.translate(-b.x, -(b.y + b.h * 0.5));
     }
+    if (b.bossPhase === 1) drawIranBoss(b);
+    else drawTrumpBoss(b);
+    ctx.restore();
+
+    // death flash + stars (drawn in screen space, not rotated)
+    if (b.dead) {
+      const pt = b.deadT;
+      if (pt < 0.3) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, 0.7 - pt * 2)})`;
+        ctx.fillRect(0, 0, W, H);
+      }
+      if (pt < 0.5) {
+        const headY = b.y + b.h * 0.4;
+        ctx.fillStyle = "#ffd84a";
+        ctx.font = "bold 34px sans-serif";
+        ctx.textAlign = "center";
+        for (let i = 0; i < 5; i++) {
+          const a = pt * 8 + i * (Math.PI * 2 / 5);
+          const sx = b.x + Math.cos(a) * 90;
+          const sy = headY + Math.sin(a) * 30;
+          ctx.fillText("★", sx, sy);
+        }
+      }
+    }
+  }
+
+  function drawIranBoss(b) {
+    // 해협 수문장 — 단순화 (카키 군복 + 베레만, 얼굴은 황금머리와 같은 톤)
+    const cx = b.x;
+    const y = b.y;
+    // body / uniform
+    ctx.fillStyle = "#5a5c3a";
+    roundRect(cx - b.w / 2 + 20, y + b.h * 0.55, b.w - 40, b.h * 0.45, 20);
+    ctx.fill();
+    // 앞섶 가운데 라인
+    ctx.fillStyle = "#44462a";
+    ctx.fillRect(cx - 2, y + b.h * 0.58, 4, b.h * 0.4);
+    // 금 버튼 3개
+    ctx.fillStyle = "#e8c04a";
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.arc(cx, y + b.h * 0.64 + i * 20, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // head — 중동 피부톤 (올리브 탠, 트럼프보다 어둡게)
+    ctx.fillStyle = "#b8895c";
+    ctx.beginPath();
+    ctx.ellipse(cx, y + b.h * 0.4, 90, 72, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // jowl shadow
+    ctx.fillStyle = "rgba(0,0,0,0.12)";
+    ctx.beginPath();
+    ctx.ellipse(cx, y + b.h * 0.5, 80, 40, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // 베레 — 단순한 한 덩어리
+    ctx.fillStyle = "#2a2e16";
+    ctx.beginPath();
+    ctx.ellipse(cx, y + b.h * 0.22, 96, 34, 0, Math.PI, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(cx - 96, y + b.h * 0.22, 192, 6);
+    // 빨간 엠블럼
+    ctx.fillStyle = "#c62a2a";
+    ctx.beginPath();
+    ctx.arc(cx - 44, y + b.h * 0.18, 6, 0, Math.PI * 2);
+    ctx.fill();
+    // 굵은 검은 눈썹 (페르시안 느낌 — 한 줄 라인으로 단순 유지)
+    ctx.fillStyle = "#1a1208";
+    roundRect(cx - 40, y + b.h * 0.34, 22, 5, 2); ctx.fill();
+    roundRect(cx + 18, y + b.h * 0.34, 22, 5, 2); ctx.fill();
+    // 검은 점 눈 (squint line 대신 동일 카운트)
+    ctx.fillStyle = "#111";
+    ctx.beginPath(); ctx.arc(cx - 27, y + b.h * 0.4, 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 27, y + b.h * 0.4, 3.5, 0, Math.PI * 2); ctx.fill();
+    // 짙은 콧수염 (입 rect 대신 — 동일 요소 1개)
+    ctx.fillStyle = "#1a1208";
+    roundRect(cx - 22, y + b.h * 0.47, 44, 7, 3); ctx.fill();
+    // arms out
+    ctx.fillStyle = "#5a5c3a";
+    roundRect(cx - b.w / 2 - 10, y + b.h * 0.55, 70, 40, 14);
+    ctx.fill();
+    roundRect(cx + b.w / 2 - 60, y + b.h * 0.55, 70, 40, 14);
+    ctx.fill();
+    // hands
+    ctx.fillStyle = "#b8895c";
+    ctx.beginPath(); ctx.arc(cx - b.w / 2 - 6, y + b.h * 0.75, 22, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + b.w / 2 + 6, y + b.h * 0.75, 22, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function drawTrumpBoss(b) {
+    const cx = b.x;
+    const y = b.y;
     // body / suit
     ctx.fillStyle = "#1b2a48";
     roundRect(cx - b.w / 2 + 20, y + b.h * 0.55, b.w - 40, b.h * 0.45, 20);
@@ -2494,61 +2979,40 @@
     ctx.beginPath();
     ctx.ellipse(cx, y + b.h * 0.5, 80, 40, 0, 0, Math.PI * 2);
     ctx.fill();
-    // signature combover — iconic swept-back pompadour with forward flop
-    const hairBase = "#e8b95a";
-    // back/side volume (widest, slightly darker — sits behind everything)
-    ctx.fillStyle = "#cc9838";
+    // 이마 위쪽에만 살짝 얹는 금발 스윕 — 머리 외곽 안에서 클리핑해서 가발처럼 얹지 않음
+    ctx.save();
     ctx.beginPath();
-    ctx.moveTo(cx - 100, y + b.h * 0.38);
-    ctx.quadraticCurveTo(cx - 118, y + 2, cx - 60, y - 18);
-    ctx.quadraticCurveTo(cx + 20, y - 26, cx + 100, y + 2);
-    ctx.quadraticCurveTo(cx + 122, y + b.h * 0.18, cx + 108, y + b.h * 0.34);
-    ctx.quadraticCurveTo(cx, y + b.h * 0.26, cx - 100, y + b.h * 0.38);
-    ctx.fill();
-    // main golden volume — pompadour swept right, higher crown on the left
-    ctx.fillStyle = hairBase;
+    ctx.ellipse(cx, y + b.h * 0.4, 90, 72, 0, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.fillStyle = "#e8b95a";
     ctx.beginPath();
-    ctx.moveTo(cx - 92, y + b.h * 0.34);
-    ctx.quadraticCurveTo(cx - 106, y - 14, cx - 34, y - 30);
-    ctx.quadraticCurveTo(cx + 46, y - 30, cx + 88, y - 4);
-    ctx.quadraticCurveTo(cx + 110, y + b.h * 0.12, cx + 92, y + b.h * 0.26);
-    ctx.quadraticCurveTo(cx + 40, y + b.h * 0.2, cx - 20, y + b.h * 0.2);
-    ctx.quadraticCurveTo(cx - 70, y + b.h * 0.22, cx - 92, y + b.h * 0.34);
+    ctx.moveTo(cx - 100, y + b.h * 0.32);
+    ctx.quadraticCurveTo(cx - 20, y + b.h * 0.36, cx + 40, y + b.h * 0.3);
+    ctx.quadraticCurveTo(cx + 80, y + b.h * 0.27, cx + 100, y + b.h * 0.26);
+    ctx.lineTo(cx + 100, y - 40);
+    ctx.lineTo(cx - 100, y - 40);
+    ctx.closePath();
     ctx.fill();
-    // forward flop bang — the iconic forehead wave, curving down to the right
+    // 앞머리 결 — 오른쪽으로 쓸리는 한 가닥 하이라이트
+    ctx.strokeStyle = "rgba(255, 232, 160, 0.55)";
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(cx - 80, y + b.h * 0.3);
-    ctx.quadraticCurveTo(cx - 30, y + b.h * 0.08, cx + 40, y + b.h * 0.14);
-    ctx.quadraticCurveTo(cx + 86, y + b.h * 0.22, cx + 94, y + b.h * 0.32);
-    ctx.quadraticCurveTo(cx + 70, y + b.h * 0.3, cx + 30, y + b.h * 0.26);
-    ctx.quadraticCurveTo(cx - 30, y + b.h * 0.24, cx - 80, y + b.h * 0.3);
-    ctx.fill();
-    // top highlight — subtle lift catches light on the crown
-    ctx.fillStyle = "#f6d080";
-    ctx.beginPath();
-    ctx.moveTo(cx - 40, y + b.h * 0.04);
-    ctx.quadraticCurveTo(cx + 10, y - 18, cx + 60, y + b.h * 0.02);
-    ctx.quadraticCurveTo(cx + 20, y + b.h * 0.1, cx - 40, y + b.h * 0.04);
-    ctx.fill();
-    // hairline shadow below the bang — grounds the bang on the forehead
-    ctx.fillStyle = "rgba(120, 80, 20, 0.28)";
-    ctx.beginPath();
-    ctx.moveTo(cx - 74, y + b.h * 0.32);
-    ctx.quadraticCurveTo(cx, y + b.h * 0.28, cx + 90, y + b.h * 0.32);
-    ctx.quadraticCurveTo(cx, y + b.h * 0.31, cx - 74, y + b.h * 0.32);
-    ctx.fill();
+    ctx.moveTo(cx - 60, y + b.h * 0.31);
+    ctx.quadraticCurveTo(cx, y + b.h * 0.28, cx + 70, y + b.h * 0.27);
+    ctx.stroke();
+    ctx.restore();
     // squint eyes
     ctx.strokeStyle = "#111";
     ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.moveTo(cx - 36, y + b.h * 0.38);
-    ctx.lineTo(cx - 18, y + b.h * 0.38);
-    ctx.moveTo(cx + 18, y + b.h * 0.38);
-    ctx.lineTo(cx + 36, y + b.h * 0.38);
+    ctx.moveTo(cx - 36, y + b.h * 0.42);
+    ctx.lineTo(cx - 18, y + b.h * 0.42);
+    ctx.moveTo(cx + 18, y + b.h * 0.42);
+    ctx.lineTo(cx + 36, y + b.h * 0.42);
     ctx.stroke();
     // mouth
     ctx.fillStyle = "#3a1f1f";
-    roundRect(cx - 18, y + b.h * 0.48, 36, 10, 4);
+    roundRect(cx - 18, y + b.h * 0.5, 36, 10, 4);
     ctx.fill();
     // arms out (blocking)
     ctx.fillStyle = "#1b2a48";
@@ -2559,44 +3023,91 @@
     ctx.fillStyle = "#f2a56a";
     ctx.beginPath(); ctx.arc(cx - b.w / 2 - 6, y + b.h * 0.75, 22, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(cx + b.w / 2 + 6, y + b.h * 0.75, 22, 0, Math.PI * 2); ctx.fill();
-
-    ctx.restore();
-
-    // death flash + stars above (drawn in screen space, not rotated)
-    if (b.dead) {
-      const pt = b.deadT;
-      if (pt < 0.3) {
-        ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, 0.7 - pt * 2)})`;
-        ctx.fillRect(0, 0, W, H);
-      }
-      // stars orbit the head during the hover
-      if (pt < 0.5) {
-        const headY = b.y + b.h * 0.4;
-        ctx.fillStyle = "#ffd84a";
-        ctx.font = "bold 34px sans-serif";
-        ctx.textAlign = "center";
-        for (let i = 0; i < 5; i++) {
-          const a = pt * 8 + i * (Math.PI * 2 / 5);
-          const sx = b.x + Math.cos(a) * 90;
-          const sy = headY + Math.sin(a) * 30;
-          ctx.fillText("★", sx, sy);
-        }
-      }
-    }
   }
 
   function drawBossAnnounce() {
-    if (state.bossAnnounce <= 0) return;
-    const alpha = Math.min(1, state.bossAnnounce);
-    ctx.fillStyle = `rgba(0, 0, 0, ${0.55 * alpha})`;
-    ctx.fillRect(0, H * 0.38, W, 180);
+    const bn = state.bossBanner;
+    if (!bn) return;
+    // 페이드 인/아웃 × 깜박임 (경보 시그널 느낌)
+    const tIn = Math.min(1, bn.t / 0.25);
+    const tOut = Math.min(1, Math.max(0, (bn.total - bn.t) / 0.4));
+    const blink = 0.6 + 0.4 * (Math.sin(bn.t * 10) > 0 ? 1 : 0); // 사각파 블링크
+    const alpha = Math.min(tIn, tOut) * blink;
+    if (alpha <= 0) return;
+
+    const theme = bn.theme;
+    const isWarn = theme === "warn"; // Iran — red/black
+    // banner backdrop — full-width slash
+    const bandY = H * 0.36;
+    const bandH = 220;
+    // diagonal dark backdrop
+    ctx.save();
+    ctx.globalAlpha = 0.7 * alpha;
+    const bgGrad = ctx.createLinearGradient(0, bandY, 0, bandY + bandH);
+    if (isWarn) {
+      bgGrad.addColorStop(0, "#1a0a0a");
+      bgGrad.addColorStop(0.5, "#3a0a0a");
+      bgGrad.addColorStop(1, "#1a0a0a");
+    } else {
+      bgGrad.addColorStop(0, "#0a1a28");
+      bgGrad.addColorStop(0.5, "#14304a");
+      bgGrad.addColorStop(1, "#0a1a28");
+    }
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, bandY, W, bandH);
+    ctx.restore();
+
+    // top/bottom accent bars
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = isWarn ? "#c0322a" : "#ffd84a";
+    ctx.fillRect(0, bandY, W, 6);
+    ctx.fillRect(0, bandY + bandH - 6, W, 6);
+
+    // stripe pattern on the backdrop (barrier/caution feel for warn; currency dollar signs for counter)
+    ctx.globalAlpha = 0.18 * alpha;
+    if (isWarn) {
+      ctx.fillStyle = "#ffd84a";
+      for (let sx = -bandH; sx < W + bandH; sx += 50) {
+        ctx.beginPath();
+        ctx.moveTo(sx, bandY);
+        ctx.lineTo(sx + 22, bandY);
+        ctx.lineTo(sx + 22 + bandH, bandY + bandH);
+        ctx.lineTo(sx + bandH, bandY + bandH);
+        ctx.closePath();
+        ctx.fill();
+      }
+    } else {
+      ctx.fillStyle = "#7ee0a1";
+      ctx.font = "bold 64px sans-serif";
+      ctx.textAlign = "center";
+      for (let sx = 60; sx < W; sx += 130) {
+        for (let sy = bandY + 40; sy < bandY + bandH; sy += 80) {
+          ctx.fillText("$", sx, sy);
+        }
+      }
+    }
+    ctx.globalAlpha = alpha;
+
+    // main title text
     ctx.textAlign = "center";
-    ctx.fillStyle = `rgba(255, 220, 80, ${alpha})`;
-    ctx.font = "bold 68px sans-serif";
-    ctx.fillText("호르무즈 해협", W / 2, H * 0.48);
-    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-    ctx.font = "bold 34px sans-serif";
-    ctx.fillText("최종 관문 — 보스 등장!", W / 2, H * 0.53);
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = isWarn ? "#ff7030" : "#ffd84a";
+    ctx.font = "bold 74px 'Apple SD Gothic Neo', sans-serif";
+    ctx.shadowColor = "rgba(0,0,0,0.75)";
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetY = 4;
+    ctx.fillText(bn.text, W / 2, bandY + bandH * 0.42);
+
+    // sub line
+    ctx.shadowOffsetY = 2;
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 28px 'Apple SD Gothic Neo', sans-serif";
+    ctx.fillText(bn.sub, W / 2, bandY + bandH * 0.72);
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+    ctx.textBaseline = "alphabetic";
+    ctx.restore();
   }
 
   function render() {
@@ -2610,12 +3121,55 @@
     drawPlayer();
     if (state.phase === "boss" || state.phase === "victory") drawBoss();
     for (const bt of state.bullets) drawBullet(bt);
+    drawBossHp();
     drawBossAnnounce();
     drawScoreFloats();
-    if (state.reveal) drawReveal();
     if (state.phase === "intro") drawIntroFg();
     if (state.phase === "outro") drawOutroBanner();
     ctx.restore();
+  }
+
+  function drawBossHp() {
+    const b = state.boss;
+    if (!b || b.dead || b.transitionT > 0) return;
+    // 보스 머리 위에 떠 있는 HP바 — HUD/배경 배너와 겹치지 않음
+    const barW = b.w + 20;
+    const barH = 14;
+    const barX = b.x - barW / 2;
+    const barY = b.y - 34;
+    // 배경
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    roundRect(barX - 4, barY - 4, barW + 8, barH + 8, 6); ctx.fill();
+    // 틀
+    ctx.fillStyle = "#15151a";
+    roundRect(barX, barY, barW, barH, 4); ctx.fill();
+    // 체력 채움
+    const ratio = Math.max(0, b.hp / b.hpMax);
+    const fillW = Math.max(0, barW * ratio);
+    const phase1 = b.bossPhase === 1;
+    const fillGrad = ctx.createLinearGradient(barX, barY, barX, barY + barH);
+    if (phase1) {
+      fillGrad.addColorStop(0, "#ff6030");
+      fillGrad.addColorStop(1, "#c02a10");
+    } else {
+      fillGrad.addColorStop(0, "#ffd84a");
+      fillGrad.addColorStop(1, "#d08a10");
+    }
+    ctx.fillStyle = fillGrad;
+    roundRect(barX, barY, fillW, barH, 4); ctx.fill();
+    // 하이라이트
+    ctx.fillStyle = "rgba(255,255,255,0.25)";
+    ctx.fillRect(barX + 2, barY + 2, Math.max(0, fillW - 4), 3);
+    // 라벨 — 바 바로 위에 작은 글씨로
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 14px 'Apple SD Gothic Neo', sans-serif";
+    ctx.shadowColor = "rgba(0,0,0,0.8)";
+    ctx.shadowBlur = 4;
+    const label = phase1 ? "해협 수문장" : "황금머리";
+    ctx.fillText(label, b.x, barY - 6);
+    ctx.shadowBlur = 0;
   }
 
   function drawIntroBg() {
@@ -2648,6 +3202,57 @@
       ctx.arc(rx, ry, 4 + (i % 3), 0, Math.PI * 2);
       ctx.fill();
     }
+    // 대전 동물원 arched entrance sign — big and clear so players know where they are
+    const sgCx = W / 2;
+    const sgTop = 18;
+    const sgArchW = 520;
+    const sgArchH = 96;
+    // sign shadow
+    ctx.fillStyle = "rgba(0,0,0,0.28)";
+    ctx.beginPath();
+    ctx.ellipse(sgCx, sgTop + sgArchH + 8, sgArchW / 2, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // support posts (left/right)
+    ctx.fillStyle = "#4a3a22";
+    ctx.fillRect(sgCx - sgArchW / 2 - 6, sgTop - 6, 18, 140);
+    ctx.fillRect(sgCx + sgArchW / 2 - 12, sgTop - 6, 18, 140);
+    // arch body — warm wooden plank with golden border
+    const archGrad = ctx.createLinearGradient(0, sgTop, 0, sgTop + sgArchH);
+    archGrad.addColorStop(0, "#8a5a2a");
+    archGrad.addColorStop(0.5, "#6a3e18");
+    archGrad.addColorStop(1, "#4a2a10");
+    ctx.fillStyle = archGrad;
+    roundRect(sgCx - sgArchW / 2, sgTop, sgArchW, sgArchH, 14); ctx.fill();
+    // inner gold border
+    ctx.strokeStyle = "#ffd84a";
+    ctx.lineWidth = 3;
+    roundRect(sgCx - sgArchW / 2 + 6, sgTop + 6, sgArchW - 12, sgArchH - 12, 10);
+    ctx.stroke();
+    // main text
+    ctx.fillStyle = "#ffd84a";
+    ctx.font = "bold 44px 'Apple SD Gothic Neo', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(0,0,0,0.55)";
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 3;
+    ctx.fillText("대전 동물원", sgCx, sgTop + sgArchH * 0.42);
+    ctx.shadowOffsetY = 0;
+    // subtitle
+    ctx.fillStyle = "#f5e2a8";
+    ctx.font = "bold 16px ui-monospace, 'SF Mono', Menlo, monospace";
+    ctx.fillText("DAEJEON ZOO", sgCx, sgTop + sgArchH * 0.78);
+    ctx.textBaseline = "alphabetic";
+    // paw-print decorations on both sides of the text
+    ctx.fillStyle = "#ffd84a";
+    for (const pawX of [sgCx - sgArchW / 2 + 40, sgCx + sgArchW / 2 - 40]) {
+      const pawY = sgTop + sgArchH * 0.5;
+      ctx.beginPath(); ctx.arc(pawX, pawY, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(pawX - 8, pawY - 8, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(pawX, pawY - 10, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(pawX + 8, pawY - 8, 3, 0, Math.PI * 2); ctx.fill();
+    }
+
     // zoo cage bars — heavy iron bars between wolf and outside
     const barTop = 140;
     const barBottom = 420;
@@ -2764,12 +3369,12 @@
         ctx.fillRect(dx, dy, 3, 3);
       }
     }
-    // hint text (only during digging phase)
+    // hint text (only during digging phase) — below the cage, above the wolf
     if (t < 2.0) {
       ctx.fillStyle = `rgba(255, 220, 80, ${0.8 + Math.sin(t * 8) * 0.2})`;
       ctx.font = "bold 28px 'Apple SD Gothic Neo', sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("땅굴을 파는 중…", W / 2, 130);
+      ctx.fillText("땅굴을 파는 중…", W / 2, 560);
     }
   }
 
@@ -2787,87 +3392,12 @@
     ctx.fillText("끝없는 바다 너머로…", W / 2, H * 0.31);
   }
 
-  function drawReveal() {
-    const r = state.reveal;
-    const t = r.t;
-    // darken background
-    ctx.fillStyle = `rgba(0,0,0,${Math.min(0.55, t * 1.5)})`;
-    ctx.fillRect(0, 0, W, H);
-    // phase A (0..0.35): big ♀ bouncing
-    // phase B (0.35..0.55): quick shrink + flash
-    // phase C (0.55..0.9): ♂ growing with 충격 lines
-    if (t < 0.35) {
-      const scale = 1 + Math.sin(t * 18) * 0.08;
-      const sz = 88 * scale;
-      drawFemaleGlyph(r.x, r.y - 40, sz, "#ff3f80");
-    } else if (t < 0.55) {
-      // white flash
-      ctx.fillStyle = `rgba(255,255,255,${1 - (t - 0.35) * 4})`;
-      ctx.fillRect(0, 0, W, H);
-    } else {
-      const grow = Math.min(1, (t - 0.55) * 4);
-      const sz = 60 + grow * 80;
-      // shock lines
-      ctx.strokeStyle = `rgba(255,220,80,${grow})`;
-      ctx.lineWidth = 4;
-      for (let i = 0; i < 12; i++) {
-        const a = (i / 12) * Math.PI * 2;
-        const r1 = sz + 20;
-        const r2 = sz + 60 + Math.sin(t * 20 + i) * 6;
-        ctx.beginPath();
-        ctx.moveTo(r.x + Math.cos(a) * r1, r.y - 40 + Math.sin(a) * r1);
-        ctx.lineTo(r.x + Math.cos(a) * r2, r.y - 40 + Math.sin(a) * r2);
-        ctx.stroke();
-      }
-      drawMaleGlyph(r.x, r.y - 40, sz, "#1e88e5");
-      // '수컷!' shout
-      ctx.fillStyle = "#ffd84a";
-      ctx.font = `bold ${Math.floor(40 + grow * 30)}px 'Apple SD Gothic Neo', sans-serif`;
-      ctx.textAlign = "center";
-      ctx.fillText("수컷!", r.x, r.y + 80);
-    }
-  }
-
-  function drawFemaleGlyph(cx, cy, size, color) {
-    const rIn = size * 0.38;
-    ctx.lineWidth = Math.max(6, size * 0.1);
-    // circle
-    ctx.strokeStyle = color;
-    ctx.beginPath();
-    ctx.arc(cx, cy - rIn * 0.4, rIn, 0, Math.PI * 2);
-    ctx.stroke();
-    // cross below
-    ctx.beginPath();
-    ctx.moveTo(cx, cy + rIn * 0.6); ctx.lineTo(cx, cy + rIn * 1.6);
-    ctx.moveTo(cx - rIn * 0.5, cy + rIn * 1.15); ctx.lineTo(cx + rIn * 0.5, cy + rIn * 1.15);
-    ctx.stroke();
-  }
-
-  function drawMaleGlyph(cx, cy, size, color) {
-    const rIn = size * 0.38;
-    ctx.lineWidth = Math.max(6, size * 0.1);
-    ctx.strokeStyle = color;
-    // circle offset lower-left
-    ctx.beginPath();
-    ctx.arc(cx - rIn * 0.25, cy + rIn * 0.25, rIn, 0, Math.PI * 2);
-    ctx.stroke();
-    // arrow up-right
-    const ax1 = cx + rIn * 0.35, ay1 = cy - rIn * 0.35;
-    const ax2 = cx + rIn * 1.15, ay2 = cy - rIn * 1.15;
-    ctx.beginPath();
-    ctx.moveTo(ax1, ay1);
-    ctx.lineTo(ax2, ay2);
-    ctx.stroke();
-    // arrow head
-    ctx.beginPath();
-    ctx.moveTo(ax2, ay2);
-    ctx.lineTo(ax2 - rIn * 0.4, ay2 + rIn * 0.08);
-    ctx.moveTo(ax2, ay2);
-    ctx.lineTo(ax2 - rIn * 0.08, ay2 + rIn * 0.4);
-    ctx.stroke();
-  }
-
   function loop(t) {
+    if (state.paused) {
+      state.lastT = t;
+      requestAnimationFrame(loop);
+      return;
+    }
     const dt = Math.min(0.033, (t - state.lastT) / 1000);
     state.lastT = t;
     update(dt);
@@ -2885,12 +3415,13 @@
 
   function onPointerDown(e) {
     e.preventDefault();
-    if (!state.running) return;
+    if (!state.running || state.paused) return;
     state.pointerActive = true;
     state.player.targetX = canvasXFromEvent(e);
   }
   function onPointerMove(e) {
     if (!state.pointerActive) return;
+    if (state.paused) return;
     e.preventDefault();
     state.player.targetX = canvasXFromEvent(e);
   }
@@ -2967,7 +3498,7 @@
       audio.suspend();
     } else {
       audio.resume();
-      if (hiddenTrack && state.running && !audio.isMuted()) {
+      if (hiddenTrack && state.running && !state.paused && !audio.isMuted()) {
         audio.startBgm(hiddenTrack);
       }
       hiddenTrack = null;
@@ -2975,7 +3506,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.30";
+  const CURRENT_VERSION = "v1.4.47";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
@@ -3017,6 +3548,37 @@
     audio.sfx.tap();
     start();
   });
+  // 프리뷰 전용 디버그 패널 (보스전·크레딧 바로가기)
+  const debugPanel = document.getElementById("debug-panel");
+  if (IS_PREVIEW && debugPanel) debugPanel.classList.remove("hidden");
+  const skipBossBtn = document.getElementById("skip-boss-btn");
+  if (skipBossBtn) {
+    skipBossBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      audio.ensure();
+      audio.sfx.tap();
+      start();
+      state.distance = BOSS_DIST - 10;
+      state.sungsimdangSpawned = true;
+      state.stadiumSpawned = true;
+      state.hanbitSpawned = true;
+      state.exitGateSpawned = true;
+      state.phase = "intro";
+      state.introT = INTRO_DURATION;
+    });
+  }
+  const skipCreditsBtn = document.getElementById("skip-credits-btn");
+  if (skipCreditsBtn) {
+    skipCreditsBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      audio.ensure();
+      audio.sfx.tap();
+      start();
+      state.running = false;
+      startOverlay.classList.add("hidden");
+      victory();
+    });
+  }
   document.getElementById("restart-btn").addEventListener("click", (e) => {
     e.stopPropagation();
     audio.ensure();
@@ -3051,6 +3613,45 @@
     audio.setMuted(nextMuted);
     refreshMuteIcon();
     if (!nextMuted) audio.sfx.tap();
+  });
+
+  const pauseBtn = document.getElementById("pause-btn");
+  function refreshPauseIcon() {
+    pauseBtn.textContent = state.paused ? "▶" : "⏸";
+  }
+  function pauseGame() {
+    if (!state.running || state.paused) return;
+    state.paused = true;
+    pausedTrack = audio.currentTrack();
+    audio.stopBgm();
+    audio.suspend();
+    pauseOverlay.classList.remove("hidden");
+    refreshPauseIcon();
+  }
+  function resumeGame() {
+    if (!state.paused) return;
+    state.paused = false;
+    audio.resume();
+    if (pausedTrack && !audio.isMuted()) audio.startBgm(pausedTrack);
+    pausedTrack = null;
+    pauseOverlay.classList.add("hidden");
+    state.lastT = performance.now();
+    refreshPauseIcon();
+  }
+  let pausedTrack = null;
+  refreshPauseIcon();
+  pauseBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!state.running) return;
+    audio.ensure();
+    audio.sfx.tap();
+    if (state.paused) resumeGame(); else pauseGame();
+  });
+  document.getElementById("resume-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    audio.ensure();
+    audio.sfx.tap();
+    resumeGame();
   });
 
   state.scenery = seedScenery();
