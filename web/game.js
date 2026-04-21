@@ -29,7 +29,7 @@
 
   const PLAYER_W = 110;
   const PLAYER_H = 130;
-  const PLAYER_Y = 980;
+  const PLAYER_Y = 1060;
   const PLAYER_MARGIN = 30;
 
   const SCROLL_START = 300;
@@ -621,10 +621,11 @@
     const o = { type, sub, x, y: -h - 40, w, h, passed: false, phase: Math.random() * Math.PI * 2 };
 
     // 투척은 역할 기반 — 사육사는 안 쏨, 포획반은 그물, 수의사는 마취총
+    // 투척 위치를 뒤로 미뤄서(몹이 화면 상단에 충분히 내려왔을 때) 탄이 몹에 뒤처져 보이는 문제 완화
     if (sub === "capture") {
-      o.throws = "net"; o.thrown = false; o.throwAtY = 180 + Math.random() * 180;
+      o.throws = "net"; o.thrown = false; o.throwAtY = 340 + Math.random() * 180;
     } else if (sub === "vet") {
-      o.throws = "dart"; o.thrown = false; o.throwAtY = 180 + Math.random() * 180;
+      o.throws = "dart"; o.thrown = false; o.throwAtY = 340 + Math.random() * 180;
     }
     state.obstacles.push(o);
   }
@@ -910,7 +911,7 @@
           b.fireTimer = 1.0;
         } else {
           // up/down/left/right drift with bounce + jitter — 페이즈 2는 속도 증가
-          const moveMult = b.bossPhase === 2 ? 1.4 : 1.0;
+          const moveMult = b.bossPhase === 2 ? 1.15 : 1.0;
           b.x += b.vx * moveMult * dt;
           b.y += b.vy * moveMult * dt;
           if (b.x < BOSS_MIN_X) { b.x = BOSS_MIN_X; b.vx = Math.abs(b.vx); }
@@ -919,11 +920,11 @@
           if (b.y > BOSS_MAX_Y) { b.y = BOSS_MAX_Y; b.vy = -Math.abs(b.vy); }
           // 방향 전환 빈도 — 페이즈 2는 더 불규칙하게
           const flipRate = b.bossPhase === 2 ? 0.022 : 0.012;
-          if (Math.random() < flipRate) b.vx = (Math.random() * 2 - 1) * (b.bossPhase === 2 ? 300 : 240);
-          if (Math.random() < flipRate) b.vy = (Math.random() * 2 - 1) * (b.bossPhase === 2 ? 170 : 130);
+          if (Math.random() < flipRate) b.vx = (Math.random() * 2 - 1) * (b.bossPhase === 2 ? 260 : 240);
+          if (Math.random() < flipRate) b.vy = (Math.random() * 2 - 1) * (b.bossPhase === 2 ? 150 : 130);
 
-          // HP drain — 페이즈 1 ~15s, 페이즈 2 ~22s (최종 보스라 더 오래 버텨야 함)
-          const drainDuration = b.bossPhase === 2 ? 22 : 15;
+          // HP drain — 페이즈 1 ~15s, 페이즈 2 ~18s (최종 보스라 조금 더 오래 버텨야 함)
+          const drainDuration = b.bossPhase === 2 ? 18 : 15;
           const drainRate = b.hpMax / drainDuration;
           b.hp = Math.max(0, b.hp - drainRate * dt);
 
@@ -935,41 +936,18 @@
             const dx = p.x - bx;
             const dy = PLAYER_Y - by;
             const mag = Math.hypot(dx, dy) || 1;
-            const speed = b.bossPhase === 1 ? 480 : 560;
+            // 페이즈 2는 단발이지만 더 빠른 탄속 + 더 높은 연사력
+            const speed = b.bossPhase === 1 ? 480 : 620;
             const kind = b.bossPhase === 1 ? "oilbarrel" : "money";
             const r = b.bossPhase === 1 ? 26 : 24;
-            if (b.bossPhase === 2) {
-              // 최종 보스 — 조준탄 + 좌우로 벌어지는 스프레드 (3발)
-              const spread = 0.22;
-              const cos = Math.cos(spread), sin = Math.sin(spread);
-              const vxA = dx / mag * speed;
-              const vyA = dy / mag * speed;
-              // 중앙 (조준)
-              state.bullets.push({ x: bx, y: by, vx: vxA, vy: vyA, r, spin: 0, kind });
-              // 좌측 회전
-              state.bullets.push({
-                x: bx, y: by,
-                vx: vxA * cos - vyA * sin,
-                vy: vxA * sin + vyA * cos,
-                r, spin: 0, kind,
-              });
-              // 우측 회전
-              state.bullets.push({
-                x: bx, y: by,
-                vx: vxA * cos + vyA * sin,
-                vy: -vxA * sin + vyA * cos,
-                r, spin: 0, kind,
-              });
-            } else {
-              state.bullets.push({
-                x: bx, y: by,
-                vx: dx / mag * speed,
-                vy: dy / mag * speed,
-                r, spin: 0, kind,
-              });
-            }
+            state.bullets.push({
+              x: bx, y: by,
+              vx: dx / mag * speed,
+              vy: dy / mag * speed,
+              r, spin: 0, kind,
+            });
             audio.sfx.bossFire();
-            b.fireTimer = b.bossPhase === 1 ? 1.05 : 0.7;
+            b.fireTimer = b.bossPhase === 1 ? 1.05 : 0.5;
           }
 
           // HP 소진 → 두 보스 모두 쓰러지는 연출 먼저 (마리오식 스핀+낙하)
@@ -3484,7 +3462,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.43";
+  const CURRENT_VERSION = "v1.4.44";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
