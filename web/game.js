@@ -12,6 +12,16 @@
       document.addEventListener("DOMContentLoaded", () => document.body.appendChild(badge));
     }
     document.title = "[PREVIEW] " + document.title;
+    // 파비콘 / 홈스크린 아이콘을 프리뷰 전용으로 교체 (메인 앱 아이콘과 구분)
+    const swapIconHrefs = () => {
+      document.querySelectorAll(
+        'link[rel="icon"], link[rel="apple-touch-icon"], link[rel="shortcut icon"]'
+      ).forEach((el) => {
+        el.href = "icon-preview.svg";
+      });
+    };
+    swapIconHrefs();
+    document.addEventListener("DOMContentLoaded", swapIconHrefs);
   }
 
   const W = 720;
@@ -3594,7 +3604,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.37";
+  const CURRENT_VERSION = "v1.4.38";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
