@@ -279,6 +279,7 @@ button:active {
   flex-wrap: wrap;
   justify-content: center;
 }
+.debug-panel.hidden { display: none; }
 .debug-btn {
   font-size: 15px;
   padding: 10px 18px;
