@@ -990,9 +990,13 @@
     }
 
     // bullets update
+    // net/dart는 월드 공간의 물체 — 세계 스크롤과 함께 내려가야 "뒤에 남겨진/올라가는" 것처럼 보이지 않음
     for (const bt of state.bullets) {
       bt.x += bt.vx * dt;
       bt.y += bt.vy * dt;
+      if (bt.kind === "net" || bt.kind === "dart") {
+        bt.y += state.scroll * dt;
+      }
       bt.spin += dt * 6;
     }
     state.bullets = state.bullets.filter(
@@ -1811,7 +1815,7 @@
     ctx.font = "bold 32px 'Apple SD Gothic Neo', sans-serif";
     ctx.fillText("안녕히 가세요", sgnX + sgnW / 2, sgnY + 34);
     ctx.font = "bold 22px 'Apple SD Gothic Neo', sans-serif";
-    ctx.fillText("― 대전 시경계 ―", sgnX + sgnW / 2, sgnY + 66);
+    ctx.fillText("대전광역시", sgnX + sgnW / 2, sgnY + 66);
     // sub line
     ctx.font = "bold 14px ui-monospace, 'SF Mono', Menlo, monospace";
     ctx.fillStyle = "#cfe4d6";
@@ -3489,7 +3493,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.45";
+  const CURRENT_VERSION = "v1.4.46";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
