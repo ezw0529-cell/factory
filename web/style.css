@@ -273,7 +273,7 @@ button:active {
 
 .preview-badge {
   position: fixed;
-  top: max(10px, env(safe-area-inset-top, 0px));
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   left: 10px;
   background: #c0322a;
   color: #fff;

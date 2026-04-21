@@ -547,12 +547,12 @@
     finalScoreEl.textContent = "점수 " + state.score;
     finalBestEl.textContent = "최고 " + state.best;
     if (reason === "oil") {
-      overTitleEl.textContent = "기름통에 맞았다!";
-      overSubEl.textContent = "해협은 봉쇄됐다.";
+      overTitleEl.textContent = "해협 봉쇄를 뚫지 못했다";
+      overSubEl.textContent = "수문장의 기름통에 길이 막혔다.";
       overSubEl.classList.remove("hidden");
     } else if (reason === "money") {
-      overTitleEl.textContent = "돈뭉치에 맞았다!";
-      overSubEl.textContent = "금권의 압박에 길이 막혔다.";
+      overTitleEl.textContent = "역봉쇄를 뚫지 못했다";
+      overSubEl.textContent = "황금머리의 금권에 길이 막혔다.";
       overSubEl.classList.remove("hidden");
     } else if (reason === "trump") {
       overTitleEl.textContent = "최종 보스에게 잡혔다";
@@ -3030,97 +3030,256 @@
   }
 
   function drawTrumpBoss(b) {
+    // 처음부터 리뉴얼 — 실제 인물 캐리커처 특징 최대한 반영:
+    // ① 길쭉한 오렌지 얼굴 ② 눈 주변 하얀 태닝 자국 ③ 한쪽으로 길게 쓸어간 금발 콤오버
+    // ④ 처진 눈썹·작은 눈 ⑤ 이중턱·목살 ⑥ 파랑 수트·흰 셔츠·긴 빨강 넥타이
     const cx = b.x;
     const y = b.y;
-    // body / suit
-    ctx.fillStyle = "#1b2a48";
-    roundRect(cx - b.w / 2 + 20, y + b.h * 0.55, b.w - 40, b.h * 0.45, 20);
+
+    // 색 팔레트
+    const SKIN = "#e89856";       // 진한 탠
+    const SKIN_HI = "#f5c48a";    // 눈 주변 밝은 탠자국
+    const SKIN_SHADE = "#c87838"; // 주름/그림자
+    const HAIR = "#f5d87a";       // 연금발
+    const HAIR_SHADE = "#d8b048"; // 머리 결
+    const HAIR_HI = "#fbeaa8";    // 하이라이트
+    const SUIT = "#14233f";
+    const TIE = "#c62a2a";
+
+    // 목 + 이중턱
+    ctx.fillStyle = SKIN;
+    roundRect(cx - 46, y + b.h * 0.55, 92, 40, 14); ctx.fill();
+    // 목주름
+    ctx.strokeStyle = "rgba(120, 70, 30, 0.3)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 36, y + b.h * 0.62);
+    ctx.quadraticCurveTo(cx, y + b.h * 0.66, cx + 36, y + b.h * 0.62);
+    ctx.stroke();
+
+    // 수트 어깨 (머리 뒤로 깔리는 부분) + 앞판
+    ctx.fillStyle = SUIT;
+    roundRect(cx - b.w / 2 + 14, y + b.h * 0.58, b.w - 28, b.h * 0.44, 18);
     ctx.fill();
-    // shirt v
+    // 수트 깃 (라펠) — 흰셔츠 위로 뾰족한 V
+    ctx.fillStyle = "#0b1529";
+    ctx.beginPath();
+    ctx.moveTo(cx - 46, y + b.h * 0.6);
+    ctx.lineTo(cx, y + b.h * 0.76);
+    ctx.lineTo(cx + 46, y + b.h * 0.6);
+    ctx.lineTo(cx + 56, y + b.h * 0.72);
+    ctx.lineTo(cx + 10, y + b.h * 0.86);
+    ctx.lineTo(cx - 10, y + b.h * 0.86);
+    ctx.lineTo(cx - 56, y + b.h * 0.72);
+    ctx.closePath();
+    ctx.fill();
+    // 흰 셔츠 V
     ctx.fillStyle = "#ffffff";
     ctx.beginPath();
-    ctx.moveTo(cx - 30, y + b.h * 0.55);
+    ctx.moveTo(cx - 32, y + b.h * 0.6);
     ctx.lineTo(cx, y + b.h * 0.78);
-    ctx.lineTo(cx + 30, y + b.h * 0.55);
+    ctx.lineTo(cx + 32, y + b.h * 0.6);
     ctx.closePath();
     ctx.fill();
-    // red tie
-    ctx.fillStyle = "#d62a2a";
+    // 빨강 넥타이 — 유난히 길게 내려감 (아래쪽으로 b.h 95%까지)
+    ctx.fillStyle = TIE;
     ctx.beginPath();
-    ctx.moveTo(cx - 14, y + b.h * 0.55);
-    ctx.lineTo(cx + 14, y + b.h * 0.55);
-    ctx.lineTo(cx + 10, y + b.h * 0.72);
-    ctx.lineTo(cx, y + b.h * 0.95);
-    ctx.lineTo(cx - 10, y + b.h * 0.72);
+    ctx.moveTo(cx - 14, y + b.h * 0.6);
+    ctx.lineTo(cx + 14, y + b.h * 0.6);
+    ctx.lineTo(cx + 10, y + b.h * 0.76);
+    ctx.lineTo(cx + 16, y + b.h * 0.98);
+    ctx.lineTo(cx - 16, y + b.h * 0.98);
+    ctx.lineTo(cx - 10, y + b.h * 0.76);
     ctx.closePath();
     ctx.fill();
-    // head (orange tan)
-    ctx.fillStyle = "#f2a56a";
+    // 넥타이 매듭 강조
+    ctx.fillStyle = "#8a1818";
+    roundRect(cx - 14, y + b.h * 0.58, 28, 10, 3); ctx.fill();
+
+    // 머리 뒤쪽 볼륨 (크라운 뒤) — 얼굴 그리기 전에 뒤로 깔아둠
+    ctx.fillStyle = HAIR_SHADE;
     ctx.beginPath();
-    ctx.ellipse(cx, y + b.h * 0.4, 90, 72, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // jowl shadow
-    ctx.fillStyle = "rgba(0,0,0,0.08)";
-    ctx.beginPath();
-    ctx.ellipse(cx, y + b.h * 0.5, 80, 40, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // 금발 콤오버 — 한 덩어리로 그려서 투톤/가발 느낌 없애기
-    const hairBase = "#e8b95a";
-    ctx.fillStyle = hairBase;
-    ctx.beginPath();
-    // 머리 실루엣: 왼쪽 귀밑에서 시작해 위로 부풀어 오르다 오른쪽으로 쓸어내리고 이마선으로 닫음
-    ctx.moveTo(cx - 88, y + b.h * 0.32);
-    // 왼쪽 측면 → 정수리 (솟아오른 크라운)
-    ctx.quadraticCurveTo(cx - 104, y - 2, cx - 50, y - 22);
-    // 정수리 → 오른쪽 꼭대기
-    ctx.quadraticCurveTo(cx + 20, y - 30, cx + 82, y - 12);
-    // 오른쪽 꼭대기 → 오른쪽 측면
-    ctx.quadraticCurveTo(cx + 112, y + b.h * 0.1, cx + 96, y + b.h * 0.3);
-    // 이마선 (앞으로 쓸려 내려온 뱅) — 오른쪽에서 시작해 왼쪽까지 부드럽게
-    ctx.quadraticCurveTo(cx + 70, y + b.h * 0.3, cx + 40, y + b.h * 0.26);
-    ctx.quadraticCurveTo(cx, y + b.h * 0.22, cx - 40, y + b.h * 0.28);
-    ctx.quadraticCurveTo(cx - 70, y + b.h * 0.3, cx - 88, y + b.h * 0.32);
+    ctx.moveTo(cx - 96, y + b.h * 0.22);
+    ctx.quadraticCurveTo(cx - 108, y - 10, cx - 40, y - 28);
+    ctx.quadraticCurveTo(cx + 30, y - 32, cx + 96, y - 10);
+    ctx.quadraticCurveTo(cx + 112, y + b.h * 0.14, cx + 96, y + b.h * 0.3);
+    ctx.quadraticCurveTo(cx + 80, y + b.h * 0.22, cx, y + b.h * 0.22);
+    ctx.quadraticCurveTo(cx - 80, y + b.h * 0.22, cx - 96, y + b.h * 0.22);
     ctx.closePath();
     ctx.fill();
-    // 크라운 하이라이트 — 같은 덩어리 위에 살짝 얹는 자연스러운 하이라이트
-    ctx.fillStyle = "#f5d278";
+
+    // 얼굴 — 세로로 길쭉한 타원
+    ctx.fillStyle = SKIN;
     ctx.beginPath();
-    ctx.moveTo(cx - 30, y - 8);
-    ctx.quadraticCurveTo(cx + 20, y - 24, cx + 60, y - 10);
-    ctx.quadraticCurveTo(cx + 30, y + b.h * 0.04, cx - 10, y + b.h * 0.02);
-    ctx.quadraticCurveTo(cx - 30, y - 2, cx - 30, y - 8);
+    ctx.ellipse(cx, y + b.h * 0.42, 82, 86, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // 이중턱 (아래에 작은 타원)
+    ctx.beginPath();
+    ctx.ellipse(cx, y + b.h * 0.56, 62, 26, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // 광대/뺨 쉐이드 (살짝 붉은기)
+    ctx.fillStyle = "rgba(200, 90, 50, 0.18)";
+    ctx.beginPath();
+    ctx.ellipse(cx - 54, y + b.h * 0.46, 18, 12, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + 54, y + b.h * 0.46, 18, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 눈 주변 하얀 태닝 자국 — 고글 모양 두 개
+    ctx.fillStyle = SKIN_HI;
+    ctx.beginPath();
+    ctx.ellipse(cx - 26, y + b.h * 0.37, 26, 18, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + 26, y + b.h * 0.37, 26, 18, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 눈썹 — 옅은 금발, 바깥쪽 처진
+    ctx.strokeStyle = "#b89048";
+    ctx.lineWidth = 5;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(cx - 46, y + b.h * 0.31);
+    ctx.quadraticCurveTo(cx - 28, y + b.h * 0.29, cx - 8, y + b.h * 0.33);
+    ctx.moveTo(cx + 8, y + b.h * 0.33);
+    ctx.quadraticCurveTo(cx + 28, y + b.h * 0.29, cx + 46, y + b.h * 0.31);
+    ctx.stroke();
+    ctx.lineCap = "butt";
+
+    // 눈 — 작고 가는 실눈, 파란 홍채
+    // 흰자
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.ellipse(cx - 26, y + b.h * 0.38, 12, 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + 26, y + b.h * 0.38, 12, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // 홍채 (옅은 파랑)
+    ctx.fillStyle = "#3a6a90";
+    ctx.beginPath();
+    ctx.arc(cx - 26, y + b.h * 0.38, 4, 0, Math.PI * 2);
+    ctx.arc(cx + 26, y + b.h * 0.38, 4, 0, Math.PI * 2);
+    ctx.fill();
+    // 동공
+    ctx.fillStyle = "#0a0a0a";
+    ctx.beginPath();
+    ctx.arc(cx - 26, y + b.h * 0.38, 2, 0, Math.PI * 2);
+    ctx.arc(cx + 26, y + b.h * 0.38, 2, 0, Math.PI * 2);
+    ctx.fill();
+    // 눈밑 처진 선
+    ctx.strokeStyle = "rgba(140, 80, 40, 0.5)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 38, y + b.h * 0.42);
+    ctx.quadraticCurveTo(cx - 26, y + b.h * 0.44, cx - 14, y + b.h * 0.42);
+    ctx.moveTo(cx + 14, y + b.h * 0.42);
+    ctx.quadraticCurveTo(cx + 26, y + b.h * 0.44, cx + 38, y + b.h * 0.42);
+    ctx.stroke();
+
+    // 코 — 얼굴 중앙 세로로
+    ctx.strokeStyle = SKIN_SHADE;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 6, y + b.h * 0.38);
+    ctx.quadraticCurveTo(cx - 10, y + b.h * 0.48, cx - 4, y + b.h * 0.5);
+    ctx.lineTo(cx + 4, y + b.h * 0.5);
+    ctx.quadraticCurveTo(cx + 10, y + b.h * 0.48, cx + 6, y + b.h * 0.38);
+    ctx.stroke();
+    // 콧구멍
+    ctx.fillStyle = "rgba(90, 40, 20, 0.45)";
+    ctx.beginPath();
+    ctx.ellipse(cx - 4, y + b.h * 0.5, 2, 1.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + 4, y + b.h * 0.5, 2, 1.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 입 — 작고 오므린 pout (로즈버드 립)
+    ctx.fillStyle = "#c06060";
+    ctx.beginPath();
+    ctx.ellipse(cx, y + b.h * 0.54, 14, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#7a3030";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx - 14, y + b.h * 0.54);
+    ctx.quadraticCurveTo(cx, y + b.h * 0.545, cx + 14, y + b.h * 0.54);
+    ctx.stroke();
+    // 입 위 인중
+    ctx.beginPath();
+    ctx.moveTo(cx, y + b.h * 0.51);
+    ctx.lineTo(cx, y + b.h * 0.535);
+    ctx.stroke();
+
+    // 콤오버 — 이마 한쪽에서 시작해 반대쪽으로 길게 쓸어넘김 (단일 덩어리)
+    ctx.fillStyle = HAIR;
+    ctx.beginPath();
+    // 시작점: 왼쪽 이마 (귀 위)
+    ctx.moveTo(cx - 82, y + b.h * 0.26);
+    // 왼쪽 측면 위로 솟으며 크라운까지
+    ctx.quadraticCurveTo(cx - 96, y - 4, cx - 40, y - 22);
+    // 크라운 정점
+    ctx.quadraticCurveTo(cx + 20, y - 28, cx + 84, y - 8);
+    // 오른쪽으로 쓸려 내려가는 긴 스트랜드 — 한참 아래까지 흘러감
+    ctx.quadraticCurveTo(cx + 108, y + b.h * 0.16, cx + 96, y + b.h * 0.32);
+    ctx.quadraticCurveTo(cx + 86, y + b.h * 0.36, cx + 64, y + b.h * 0.3);
+    // 이마 앞뱅 — 왼쪽에서 오른쪽으로 흘러가는 한 줄기
+    ctx.quadraticCurveTo(cx + 20, y + b.h * 0.24, cx - 30, y + b.h * 0.28);
+    // 다시 왼쪽 시작점으로 내려감
+    ctx.quadraticCurveTo(cx - 66, y + b.h * 0.3, cx - 82, y + b.h * 0.26);
     ctx.closePath();
     ctx.fill();
-    // 이마선 아래 부드러운 그림자 (얼굴과 머리 경계를 자연스럽게)
+
+    // 콤오버 방향 결 (가느다란 선으로 쓸림 강조)
+    ctx.strokeStyle = HAIR_SHADE;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const t = i / 5;
+      const sx = cx - 70 + t * 20;
+      const sy = y - 10 + t * 4;
+      const ex = cx + 80 - t * 10;
+      const ey = y + b.h * 0.28 - t * 4;
+      ctx.moveTo(sx, sy);
+      ctx.quadraticCurveTo(cx + 10, y - 4 + t * 8, ex, ey);
+    }
+    ctx.stroke();
+
+    // 콤오버 하이라이트 — 쓸린 방향을 따라 가는 밝은 줄
+    ctx.strokeStyle = HAIR_HI;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx - 50, y - 14);
+    ctx.quadraticCurveTo(cx + 10, y - 20, cx + 72, y + b.h * 0.02);
+    ctx.stroke();
+
+    // 이마-머리 경계 음영 (가발처럼 들뜨지 않게)
     ctx.strokeStyle = "rgba(120, 80, 20, 0.35)";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(cx - 78, y + b.h * 0.32);
-    ctx.quadraticCurveTo(cx - 30, y + b.h * 0.3, cx + 30, y + b.h * 0.28);
-    ctx.quadraticCurveTo(cx + 70, y + b.h * 0.3, cx + 92, y + b.h * 0.32);
+    ctx.moveTo(cx - 74, y + b.h * 0.28);
+    ctx.quadraticCurveTo(cx - 10, y + b.h * 0.26, cx + 60, y + b.h * 0.3);
     ctx.stroke();
-    // squint eyes
-    ctx.strokeStyle = "#111";
-    ctx.lineWidth = 4;
+
+    // 귀 — 머리 오른쪽이 살짝 보임 (콤오버가 덮지 못한 부분)
+    ctx.fillStyle = SKIN;
     ctx.beginPath();
-    ctx.moveTo(cx - 36, y + b.h * 0.38);
-    ctx.lineTo(cx - 18, y + b.h * 0.38);
-    ctx.moveTo(cx + 18, y + b.h * 0.38);
-    ctx.lineTo(cx + 36, y + b.h * 0.38);
+    ctx.ellipse(cx - 82, y + b.h * 0.42, 8, 14, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = SKIN_SHADE;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(cx - 82, y + b.h * 0.42, 4, 0, Math.PI * 2);
     ctx.stroke();
-    // mouth
-    ctx.fillStyle = "#3a1f1f";
-    roundRect(cx - 18, y + b.h * 0.48, 36, 10, 4);
+
+    // 팔 — 옆으로 뻗은 수트 소매
+    ctx.fillStyle = SUIT;
+    roundRect(cx - b.w / 2 - 8, y + b.h * 0.6, 72, 42, 16);
     ctx.fill();
-    // arms out (blocking)
-    ctx.fillStyle = "#1b2a48";
-    roundRect(cx - b.w / 2 - 10, y + b.h * 0.55, 70, 40, 14);
+    roundRect(cx + b.w / 2 - 64, y + b.h * 0.6, 72, 42, 16);
     ctx.fill();
-    roundRect(cx + b.w / 2 - 60, y + b.h * 0.55, 70, 40, 14);
-    ctx.fill();
-    ctx.fillStyle = "#f2a56a";
-    ctx.beginPath(); ctx.arc(cx - b.w / 2 - 6, y + b.h * 0.75, 22, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx + b.w / 2 + 6, y + b.h * 0.75, 22, 0, Math.PI * 2); ctx.fill();
+    // 흰 소매 끝단
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(cx - b.w / 2 - 2, y + b.h * 0.78, 14, 8);
+    ctx.fillRect(cx + b.w / 2 - 12, y + b.h * 0.78, 14, 8);
+    // 손
+    ctx.fillStyle = SKIN;
+    ctx.beginPath(); ctx.arc(cx - b.w / 2 - 2, y + b.h * 0.84, 22, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + b.w / 2 + 2, y + b.h * 0.84, 22, 0, Math.PI * 2); ctx.fill();
   }
 
   function drawBossAnnounce() {
@@ -3604,7 +3763,7 @@
     }
   });
 
-  const CURRENT_VERSION = "v1.4.38";
+  const CURRENT_VERSION = "v1.4.39";
   let updateBannerShown = false;
   async function checkVersion() {
     if (updateBannerShown) return;
